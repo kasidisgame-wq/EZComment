@@ -317,6 +317,15 @@
   }
   .follow-btn svg { flex-shrink: 0; }
   .message { font-size: 14px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
+  .comment-image { margin-top: 10px; }
+  .comment-image img {
+    max-width: 240px;
+    max-height: 240px;
+    border-radius: 8px;
+    display: block;
+    border: 1px solid var(--border);
+    cursor: pointer;
+  }
   .meta {
     margin-top: 10px; display: flex; justify-content: space-between; align-items: center;
     font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--muted);
@@ -831,6 +840,7 @@
           </div>
         </div>
         <div class="message">${escapeHtml(c.message)}</div>
+        ${c.attachment_url ? `<div class="comment-image"><a href="${escapeHtml(c.attachment_url)}" target="_blank" rel="noopener"><img src="${escapeHtml(c.attachment_url)}" loading="lazy" alt="รูปที่แนบมากับคอมเมนต์"></a></div>` : ''}
         <div class="meta">
           <span class="time-block">
             <span class="relative">${timeAgo(c.created_time)}</span>
