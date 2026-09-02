@@ -1,0 +1,1839 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EXE FB MONITORING — Zone4 / TOSM 2026</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #161a21;
+    --panel-hover: #1c2129;
+    --border: #262b34;
+    --text: #e6e8eb;
+    --muted: #8b95a1;
+    --zone4: #38bdf8;
+    --tosm: #f97316;
+    --accent: #22c55e;
+    --follow: #fbbf24;
+  }
+  html.light {
+    --bg: #f5f6f8;
+    --panel: #ffffff;
+    --panel-hover: #f0f1f3;
+    --border: #e2e5ea;
+    --text: #1a1d23;
+    --muted: #6b7280;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Prompt', 'IBM Plex Mono', sans-serif;
+    min-height: 100vh;
+    transition: background 0.2s, color 0.2s;
+  }
+
+  /* ---------- Header ---------- */
+  header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: var(--bg);
+    border-bottom: 2px solid var(--border);
+    background-image: linear-gradient(90deg, rgba(56,189,248,0.08), rgba(249,115,22,0.08));
+  }
+  .header-top {
+    padding: 18px 24px 12px;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 12px;
+  }
+  .brand-left { display: flex; align-items: center; gap: 12px; }
+  .brand-icon {
+    width: 40px; height: 40px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, var(--zone4), var(--tosm));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+  .brand-center { text-align: center; }
+  h1 {
+    font-family: 'Prompt', sans-serif;
+    font-size: 20px;
+    font-weight: 700;
+    margin: 0;
+    letter-spacing: 0.4px;
+  }
+  .subtitle {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+  .header-right { display: flex; align-items: center; gap: 14px; justify-content: flex-end; }
+  .status {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+  }
+  .dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 0 rgba(34,197,94,0.6);
+    animation: pulse 2s infinite;
+    flex-shrink: 0;
+  }
+  @keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(34,197,94,0.5); }
+    70% { box-shadow: 0 0 0 8px rgba(34,197,94,0); }
+    100% { box-shadow: 0 0 0 0 rgba(34,197,94,0); }
+  }
+  .theme-toggle {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: var(--panel);
+    color: var(--text);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    flex-shrink: 0;
+  }
+  .theme-toggle.active { background: var(--accent); border-color: var(--accent); color: white; }
+
+  .header-bottom {
+    padding: 0 24px 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .mode-tabs {
+    display: flex;
+    gap: 4px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 3px;
+  }
+  .mode-btn {
+    font-family: 'Prompt', sans-serif;
+    font-weight: 600;
+    font-size: 13px;
+    padding: 7px 16px;
+    border-radius: 8px;
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .mode-btn.active { color: var(--bg); background: var(--text); }
+
+  .tabs { display: flex; gap: 6px; }
+  .tab-btn {
+    font-family: 'Prompt', sans-serif;
+    font-weight: 500;
+    font-size: 13px;
+    padding: 6px 14px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--panel);
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .tab-btn.active { color: var(--text); border-color: var(--text); background: var(--panel-hover); }
+
+  /* ---------- Layout ---------- */
+  .layout {
+    display: flex;
+    align-items: flex-start;
+  }
+  aside {
+    width: 290px;
+    flex-shrink: 0;
+    border-right: 1px solid var(--border);
+    height: calc(100vh - 118px);
+    overflow-y: auto;
+    position: sticky;
+    top: 118px;
+    padding: 12px;
+  }
+  .search-box {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 12px;
+    margin-bottom: 12px;
+  }
+  .search-box input {
+    border: none;
+    outline: none;
+    background: transparent;
+    color: var(--text);
+    font-family: 'Prompt', sans-serif;
+    font-size: 13px;
+    width: 100%;
+  }
+  .search-box input::placeholder { color: var(--muted); }
+  .search-box svg { flex-shrink: 0; color: var(--muted); }
+
+  .sidebar-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--muted);
+    padding: 4px 8px 10px;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+  .post-item {
+    padding: 10px 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    margin-bottom: 4px;
+    border: 1px solid transparent;
+  }
+  .post-item:hover { background: var(--panel-hover); }
+  .post-item.active { background: var(--panel-hover); border-color: var(--border); }
+  .post-item .post-snippet {
+    font-size: 13px;
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    margin-bottom: 6px;
+  }
+  .post-item .post-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 10px;
+    color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace;
+  }
+  .post-tag {
+    font-size: 9px;
+    padding: 1px 6px;
+    border-radius: 999px;
+    text-transform: uppercase;
+  }
+  .post-tag.zone4 { background: rgba(56,189,248,0.15); color: var(--zone4); }
+  .post-tag.tosm { background: rgba(249,115,22,0.15); color: var(--tosm); }
+
+  main { flex: 1; max-width: 860px; margin: 0 auto; padding: 20px 20px 60px; min-width: 0; }
+  .layout.no-sidebar aside { display: none; }
+  .layout.no-sidebar main { max-width: 900px; margin: 0 auto; }
+
+  .active-filter-bar {
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    margin-bottom: 14px;
+    font-size: 13px;
+  }
+  .active-filter-bar.show { display: flex; }
+  .clear-filter {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    cursor: pointer;
+    border: 1px solid var(--border);
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: transparent;
+  }
+
+  /* ---------- Comment cards ---------- */
+  .comment {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    animation: fadeIn 0.4s ease;
+    transition: border-color 0.15s;
+  }
+  .comment.followed { border-color: var(--follow); }
+  .comment.archived { opacity: 0.55; }
+  .archive-btn {
+    display: flex; align-items: center; gap: 5px;
+    font-family: 'Prompt', sans-serif;
+    font-size: 11px; font-weight: 600;
+    padding: 4px 10px; border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--panel-hover);
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .archive-btn.on { background: rgba(239,68,68,0.15); border-color: #ef4444; color: #ef4444; }
+  .reply-toggle-btn {
+    display: flex; align-items: center; gap: 5px;
+    font-family: 'Prompt', sans-serif;
+    font-size: 11px; font-weight: 600;
+    padding: 4px 10px; border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--panel-hover);
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .reply-box { margin-top: 10px; display: none; }
+  .reply-box.open { display: block; }
+  .reply-box textarea {
+    width: 100%;
+    min-height: 120px;
+    background: var(--panel-hover);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    color: var(--text);
+    font-family: 'Prompt', sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    resize: vertical;
+  }
+  .reply-box-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 6px; }
+  .category-select {
+    width: 100%;
+    margin-top: 8px;
+    padding: 7px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--panel-hover);
+    color: var(--text);
+    font-family: 'Prompt', sans-serif;
+    font-size: 12px;
+  }
+  .reply-send-btn {
+    font-family: 'Prompt', sans-serif; font-size: 12px; font-weight: 600;
+    padding: 6px 14px; border-radius: 999px; border: none;
+    background: var(--accent); color: white; cursor: pointer;
+  }
+  .reply-send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .reply-status { font-size: 11px; color: var(--muted); font-family: 'IBM Plex Mono', monospace; }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .comment-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+  .who { display: flex; align-items: center; gap: 10px; }
+  .avatar {
+    width: 32px; height: 32px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'IBM Plex Mono', monospace; font-size: 13px; font-weight: 600;
+    color: #0f1115; flex-shrink: 0;
+  }
+  .avatar.generic { background: var(--border); color: var(--muted); }
+  .from { font-weight: 600; font-size: 14px; }
+  .from.anonymous { color: var(--muted); font-weight: 500; font-style: italic; }
+  .comment-top-right { display: flex; align-items: center; gap: 8px; }
+  .tag {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px; padding: 2px 8px; border-radius: 999px;
+    text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .tag.zone4 { background: rgba(56,189,248,0.15); color: var(--zone4); }
+  .tag.tosm { background: rgba(249,115,22,0.15); color: var(--tosm); }
+  .follow-btn {
+    display: flex; align-items: center; gap: 5px;
+    font-family: 'Prompt', sans-serif;
+    font-size: 11px; font-weight: 600;
+    padding: 4px 10px; border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--panel-hover);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .follow-btn.on {
+    background: rgba(251,191,36,0.15);
+    border-color: var(--follow);
+    color: var(--follow);
+  }
+  .follow-btn svg { flex-shrink: 0; }
+  .message { font-size: 14px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
+  .comment-image { margin-top: 10px; }
+  .comment-image img {
+    max-width: 240px;
+    max-height: 240px;
+    border-radius: 8px;
+    display: block;
+    border: 1px solid var(--border);
+    cursor: pointer;
+  }
+  .meta {
+    margin-top: 10px; display: flex; justify-content: space-between; align-items: center;
+    font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--muted);
+  }
+  .meta a {
+    color: white;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: #1877F2;
+    padding: 5px 12px;
+    border-radius: 999px;
+    font-weight: 600;
+    transition: opacity 0.15s;
+  }
+  .meta a:hover { opacity: 0.85; color: white; }
+  .time-block { display: flex; flex-direction: column; gap: 1px; }
+  .time-block .relative { font-weight: 500; }
+  .time-block .absolute { font-size: 10px; opacity: 0.75; }
+
+  /* ---------- Post archive cards ---------- */
+  .post-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 18px;
+    margin-bottom: 12px;
+  }
+  .post-card-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .post-card .message { font-size: 14px; margin-bottom: 12px; }
+  .post-card-footer { display: flex; justify-content: space-between; align-items: center; }
+  .post-card-footer .left { display: flex; gap: 14px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--muted); }
+  .archive-section-title {
+    font-family: 'Prompt', sans-serif;
+    font-size: 15px; font-weight: 700;
+    margin: 24px 0 12px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .archive-section-title:first-child { margin-top: 0; }
+  .archive-section-count { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--muted); font-weight: 400; }
+  .view-comments-btn {
+    font-family: 'Prompt', sans-serif;
+    font-size: 12px; font-weight: 600;
+    padding: 6px 14px; border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--panel-hover);
+    color: var(--text);
+    cursor: pointer;
+  }
+  .fb-btn {
+    font-family: 'Prompt', sans-serif;
+    font-size: 12px; font-weight: 600;
+    padding: 6px 14px; border-radius: 999px;
+    background: #1877F2;
+    color: white;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .fb-btn:hover { opacity: 0.85; }
+
+  /* ---------- Dashboard ---------- */
+  .dash-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 14px;
+    margin-bottom: 22px;
+  }
+  .dash-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px;
+  }
+  .dash-card .num {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 28px;
+    font-weight: 600;
+    line-height: 1.1;
+  }
+  .dash-card .label {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 6px;
+  }
+  .dash-section-title {
+    font-family: 'Prompt', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    margin: 24px 0 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .dash-breakdown {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .dash-pill {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--panel);
+  }
+  .top-post-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 16px;
+    margin-bottom: 8px;
+    cursor: pointer;
+  }
+  .top-post-row:hover { background: var(--panel-hover); }
+  .top-post-row .snippet {
+    font-size: 13px;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .top-post-row .count {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+    flex-shrink: 0;
+  }
+
+  .empty { text-align: center; color: var(--muted); padding: 60px 20px; font-size: 13px; }
+  .empty svg { margin-bottom: 10px; opacity: 0.5; }
+
+  /* ---------- Audit log ---------- */
+  .audit-row {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 16px;
+    margin-bottom: 8px;
+  }
+  .audit-row-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 12px; }
+  .audit-email { font-weight: 600; }
+  .audit-time { color: var(--muted); font-family: 'IBM Plex Mono', monospace; font-size: 11px; }
+  .audit-message { font-size: 13px; line-height: 1.5; }
+  .category-tag {
+    font-family: 'Prompt', sans-serif;
+    font-size: 10px; font-weight: 600;
+    padding: 2px 9px; border-radius: 999px;
+    background: rgba(167,139,250,0.15); color: #a78bfa;
+  }
+  .audit-filters { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+  .audit-filter-chip {
+    font-family: 'Prompt', sans-serif; font-size: 12px; font-weight: 500;
+    padding: 5px 12px; border-radius: 999px;
+    border: 1px solid var(--border); background: var(--panel); color: var(--muted); cursor: pointer;
+  }
+  .audit-filter-chip.active { background: var(--panel-hover); border-color: var(--text); color: var(--text); }
+  .chart-card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+    padding: 16px; margin-bottom: 16px;
+  }
+  .chart-card canvas { max-height: 220px; }
+
+  /* ---------- Gate (login required) ---------- */
+  .gate { text-align: center; padding: 60px 20px; color: var(--muted); font-size: 13px; }
+  .gate button {
+    margin-top: 14px;
+    font-family: 'Prompt', sans-serif; font-weight: 600; font-size: 13px;
+    padding: 8px 18px; border-radius: 999px; border: none;
+    background: var(--accent); color: white; cursor: pointer;
+  }
+
+  /* ---------- User management ---------- */
+  .add-email-row { display: flex; gap: 8px; margin-bottom: 16px; }
+  .add-email-row input {
+    flex: 1; padding: 9px 12px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--panel-hover); color: var(--text); font-family: 'IBM Plex Mono', monospace; font-size: 13px;
+  }
+  .add-email-row button {
+    font-family: 'Prompt', sans-serif; font-weight: 600; font-size: 13px;
+    padding: 9px 16px; border-radius: 8px; border: none;
+    background: var(--accent); color: white; cursor: pointer; white-space: nowrap;
+  }
+  .user-row {
+    display: flex; justify-content: space-between; align-items: center;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+    padding: 10px 14px; margin-bottom: 6px;
+  }
+  .user-row .email { font-family: 'IBM Plex Mono', monospace; font-size: 13px; }
+  .user-row .added-at { color: var(--muted); font-size: 11px; margin-left: 10px; }
+  .user-row .remove-user-btn {
+    font-family: 'Prompt', sans-serif; font-size: 11px; font-weight: 600;
+    padding: 4px 10px; border-radius: 999px; border: 1px solid var(--border);
+    background: transparent; color: #ef4444; cursor: pointer;
+  }
+
+  /* ---------- Archived filter toggle ---------- */
+  .archive-filter-toggle {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    cursor: pointer;
+    border: 1px solid var(--border);
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: var(--panel);
+    margin-bottom: 12px;
+    display: inline-block;
+  }
+  .archive-filter-toggle.on { background: rgba(239,68,68,0.15); border-color: #ef4444; color: #ef4444; }
+
+  @media (max-width: 800px) {
+    aside { display: none; }
+    .header-top { grid-template-columns: auto auto; }
+    .brand-center { display: none; }
+    .dash-grid + div[style] { grid-template-columns: 1fr !important; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-top">
+    <div class="brand-left">
+      <div class="brand-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+          <path d="M4 5.5C4 4.7 4.7 4 5.5 4h13c.8 0 1.5.7 1.5 1.5v9c0 .8-.7 1.5-1.5 1.5H10l-4 3.5V16H5.5C4.7 16 4 15.3 4 14.5v-9z" fill="white" fill-opacity="0.95"/>
+          <circle cx="9" cy="10" r="1.15" fill="#38bdf8"/>
+          <circle cx="13" cy="10" r="1.15" fill="#8b95a1"/>
+          <circle cx="17" cy="10" r="1.15" fill="#f97316"/>
+        </svg>
+      </div>
+    </div>
+    <div class="brand-center">
+      <h1>EXE FB MONITORING</h1>
+      <div class="subtitle">Zone4 Extreme · TOSM 2026 — Realtime Monitoring</div>
+    </div>
+    <div class="header-right">
+      <div class="status"><span class="dot"></span><span id="statusText">กำลังเชื่อมต่อ...</span></div>
+      <button class="theme-toggle" id="loginBtn" title="เข้าสู่ระบบเพื่อตอบกลับคอมเมนต์" style="width:auto;padding:0 12px;font-family:'Prompt',sans-serif;font-size:12px;font-weight:600;gap:6px;display:flex;align-items:center;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        <span id="loginLabel">เข้าสู่ระบบ</span>
+      </button>
+      <button class="theme-toggle" id="notifyToggle" title="เปิด/ปิดการแจ้งเตือน">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="notifyIcon"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+      </button>
+      <button class="theme-toggle" id="themeToggle" title="สลับธีม">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="themeIcon"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+      </button>
+    </div>
+  </div>
+  <div class="header-bottom">
+    <div class="mode-tabs" id="modeTabs">
+      <button class="mode-btn" data-mode="dashboard">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:5px;"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
+        แดชบอร์ด
+      </button>
+      <button class="mode-btn active" data-mode="comments">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:5px;"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+        คอมเมนต์
+      </button>
+      <button class="mode-btn" data-mode="posts">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:5px;"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+        คลังโพสต์
+      </button>
+      <button class="mode-btn" data-mode="audit">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:5px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>
+        บันทึกการตอบกลับ
+      </button>
+      <button class="mode-btn" data-mode="users">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:5px;"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        ผู้ใช้งาน
+      </button>
+    </div>
+    <div class="tabs" id="pageTabs">
+      <button class="tab-btn active" data-page="all">ทั้งหมด</button>
+      <button class="tab-btn" data-page="Zone4">Zone4</button>
+      <button class="tab-btn" data-page="TOSM 2026">TOSM 2026</button>
+    </div>
+  </div>
+</header>
+
+<div class="layout">
+  <aside>
+    <div class="search-box">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" id="searchInput" placeholder="ค้นหาโพสต์...">
+    </div>
+    <div class="sidebar-title">โพสต์ที่มีคอมเมนต์</div>
+    <div id="postList"></div>
+  </aside>
+  <main>
+    <div class="active-filter-bar" id="activeFilterBar">
+      <span id="activeFilterText"></span>
+      <button class="clear-filter" id="clearFilterBtn">ล้างตัวกรอง ✕</button>
+    </div>
+    <button class="archive-filter-toggle" id="archiveFilterToggle">🗄 แสดงคอมเมนต์ที่เก็บถาวร</button>
+    <div id="feed"><div class="empty">กำลังโหลดคอมเมนต์...</div></div>
+  </main>
+</div>
+
+<div class="login-modal-overlay" id="loginModalOverlay">
+  <div class="login-modal">
+    <div class="login-modal-header">
+      <span>เข้าสู่ระบบ</span>
+      <button class="login-modal-close" id="loginModalClose">✕</button>
+    </div>
+    <div id="loginStepEmail">
+      <p class="login-modal-desc">กรอกอีเมลที่ได้รับอนุญาต ระบบจะส่งลิงก์เข้าสู่ระบบไปให้ทางอีเมล</p>
+      <input type="email" id="loginEmailInput" placeholder="you@example.com" class="login-input">
+      <button class="login-submit-btn" id="sendOtpBtn">ส่งลิงก์เข้าสู่ระบบ</button>
+      <div class="login-status" id="loginEmailStatus"></div>
+    </div>
+    <div id="loginStepCode" style="display:none;">
+      <p class="login-modal-desc">เช็คอีเมลของคุณ แล้วคลิกลิงก์ในอีเมลเพื่อเข้าสู่ระบบ (จะพากลับมาที่หน้านี้อัตโนมัติ)</p>
+      <div class="login-status" id="loginCodeStatus"></div>
+    </div>
+  </div>
+</div>
+<style>
+  .login-modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:100; align-items:center; justify-content:center; }
+  .login-modal-overlay.show { display:flex; }
+  .login-modal { background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:20px; width:320px; }
+  .login-modal-header { display:flex; justify-content:space-between; align-items:center; font-family:'Prompt',sans-serif; font-weight:600; font-size:15px; margin-bottom:10px; }
+  .login-modal-close { background:none; border:none; color:var(--muted); cursor:pointer; font-size:14px; }
+  .login-modal-desc { font-size:12px; color:var(--muted); margin:0 0 10px; }
+  .login-input { width:100%; padding:9px 12px; border-radius:8px; border:1px solid var(--border); background:var(--panel-hover); color:var(--text); font-family:'IBM Plex Mono',monospace; font-size:14px; margin-bottom:10px; box-sizing:border-box; }
+  .login-submit-btn { width:100%; padding:9px; border-radius:8px; border:none; background:var(--accent); color:white; font-family:'Prompt',sans-serif; font-weight:600; font-size:13px; cursor:pointer; }
+  .login-status { font-size:11px; color:var(--muted); margin-top:8px; font-family:'IBM Plex Mono',monospace; }
+</style>
+
+<script>
+  // ===== แก้ 2 ค่านี้ก่อน deploy =====
+  const SUPABASE_URL = 'https://jbklakekfqfvihhjyyvg.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impia2xha2VrZnFmdmloaGp5eXZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc4ODkxNTEsImV4cCI6MjEwMzQ2NTE1MX0.hbGO8yllzkduiM_SzEWV4d-ve6yI5i2PzhlYzGvov54';
+  // ===================================
+
+  const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  let allComments = [];
+  let allPosts = [];
+  let followedIds = new Set(); // comment_ids currently followed (shared, from comment_follows table)
+  let archivedIds = new Set(); // comment_ids currently archived (shared, from comment_archives table)
+  let showArchivedOnly = false;
+  let followedFilterActive = false;
+  let currentPage = 'all';      // 'all' | 'Zone4' | 'TOSM 2026'
+  let currentPostId = null;
+  let currentMode = 'comments'; // 'comments' | 'posts' | 'dashboard' | 'audit' | 'users'
+  let searchQuery = '';
+
+  // ---------- Theme ----------
+  const MOON_PATH = '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>';
+  const SUN_PATH = '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>';
+  function applyTheme(theme) {
+    document.documentElement.classList.toggle('light', theme === 'light');
+    document.getElementById('themeIcon').innerHTML = theme === 'light' ? SUN_PATH : MOON_PATH;
+    localStorage.setItem('fbfeed-theme', theme);
+  }
+  applyTheme(localStorage.getItem('fbfeed-theme') || 'dark');
+  document.getElementById('themeToggle').addEventListener('click', () => {
+    applyTheme(document.documentElement.classList.contains('light') ? 'dark' : 'light');
+  });
+
+  // ---------- Notifications + sound ----------
+  const NOTIFY_KEY = 'fbfeed-notify';
+  let audioCtx = null;
+  function getAudioCtx() {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    return audioCtx;
+  }
+  function playBeep() {
+    try {
+      const ctx = getAudioCtx();
+      if (ctx.state === 'suspended') ctx.resume();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = 880;
+      gain.gain.setValueAtTime(0.18, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.35);
+    } catch (e) { console.error('beep failed', e); }
+  }
+  function isNotifyEnabled() {
+    return localStorage.getItem(NOTIFY_KEY) === 'on' && typeof Notification !== 'undefined' && Notification.permission === 'granted';
+  }
+  function updateNotifyIcon() {
+    document.getElementById('notifyToggle').classList.toggle('active', isNotifyEnabled());
+  }
+  function showCommentNotification(c) {
+    if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+    const n = new Notification('คอมเมนต์ใหม่ — ' + c.page_name, {
+      body: (c.message || '').substring(0, 100),
+    });
+    n.onclick = () => {
+      window.focus();
+      const url = c.comment_permalink || c.post_permalink;
+      if (url) window.open(url, '_blank');
+      n.close();
+    };
+  }
+  document.getElementById('notifyToggle').addEventListener('click', async () => {
+    if (isNotifyEnabled()) {
+      localStorage.setItem(NOTIFY_KEY, 'off');
+      updateNotifyIcon();
+      return;
+    }
+    getAudioCtx();
+    if (typeof Notification === 'undefined') {
+      alert('เบราว์เซอร์นี้ไม่รองรับการแจ้งเตือน');
+      return;
+    }
+    const permission = await Notification.requestPermission();
+    if (permission === 'granted') {
+      localStorage.setItem(NOTIFY_KEY, 'on');
+      playBeep();
+    } else {
+      localStorage.setItem(NOTIFY_KEY, 'off');
+      alert('กรุณาอนุญาตการแจ้งเตือนในเบราว์เซอร์ เพื่อเปิดใช้งานฟีเจอร์นี้');
+    }
+    updateNotifyIcon();
+  });
+  updateNotifyIcon();
+
+  // ---------- Login (Supabase Auth email OTP, allow-list controlled) ----------
+  const REPLY_FUNCTION_URL = SUPABASE_URL + '/functions/v1/reply-comment';
+  const CHECK_EMAIL_FUNCTION_URL = SUPABASE_URL + '/functions/v1/check-allowed-email';
+  const MANAGE_EMAILS_FUNCTION_URL = SUPABASE_URL + '/functions/v1/manage-allowed-emails';
+  const TOGGLE_ARCHIVE_FUNCTION_URL = SUPABASE_URL + '/functions/v1/toggle-archive';
+  const REPLY_CATEGORIES = ['ทั่วไป', 'คำถาม', 'ข้อร้องเรียน/ปัญหา', 'คำชม', 'ปัญหาทางเทคนิค', 'อื่นๆ'];
+  let currentSession = null; // Supabase Auth session once logged in
+  let pendingLoginEmail = null;
+
+  async function refreshSessionState() {
+    const { data } = await supabaseClient.auth.getSession();
+    currentSession = data.session || null;
+    updateLoginUI();
+  }
+  function updateLoginUI() {
+    const label = document.getElementById('loginLabel');
+    const btn = document.getElementById('loginBtn');
+    if (currentSession) {
+      label.textContent = currentSession.user.email;
+      btn.classList.add('active');
+    } else {
+      label.textContent = 'เข้าสู่ระบบ';
+      btn.classList.remove('active');
+    }
+  }
+  supabaseClient.auth.onAuthStateChange((_event, session) => {
+    currentSession = session;
+    updateLoginUI();
+    if (session) closeLoginModal();
+  });
+  refreshSessionState();
+
+  function openLoginModal() {
+    document.getElementById('loginModalOverlay').classList.add('show');
+    document.getElementById('loginStepEmail').style.display = 'block';
+    document.getElementById('loginStepCode').style.display = 'none';
+    document.getElementById('loginEmailStatus').textContent = '';
+    document.getElementById('loginCodeStatus').textContent = '';
+  }
+  function closeLoginModal() {
+    document.getElementById('loginModalOverlay').classList.remove('show');
+  }
+  document.getElementById('loginModalClose').addEventListener('click', closeLoginModal);
+  document.getElementById('loginModalOverlay').addEventListener('click', (e) => {
+    if (e.target.id === 'loginModalOverlay') closeLoginModal();
+  });
+
+  document.getElementById('loginBtn').addEventListener('click', async () => {
+    if (currentSession) {
+      await supabaseClient.auth.signOut();
+      currentSession = null;
+      updateLoginUI();
+      return;
+    }
+    openLoginModal();
+  });
+
+  document.getElementById('sendOtpBtn').addEventListener('click', async () => {
+    const email = document.getElementById('loginEmailInput').value.trim().toLowerCase();
+    const statusEl = document.getElementById('loginEmailStatus');
+    if (!email) { statusEl.textContent = 'กรุณากรอกอีเมล'; return; }
+    statusEl.textContent = 'กำลังตรวจสอบ...';
+    try {
+      const checkResp = await fetch(CHECK_EMAIL_FUNCTION_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY },
+        body: JSON.stringify({ email }),
+      });
+      const checkData = await checkResp.json();
+      if (!checkData.allowed) {
+        statusEl.textContent = 'อีเมลนี้ไม่ได้รับอนุญาตให้เข้าใช้งาน';
+        return;
+      }
+      const { error } = await supabaseClient.auth.signInWithOtp({
+        email,
+        options: { shouldCreateUser: true, emailRedirectTo: window.location.origin + window.location.pathname },
+      });
+      if (error) { statusEl.textContent = 'ผิดพลาด: ' + error.message; return; }
+      document.getElementById('loginStepEmail').style.display = 'none';
+      document.getElementById('loginStepCode').style.display = 'block';
+      document.getElementById('loginCodeStatus').textContent = 'ส่งลิงก์ไปที่ ' + email + ' แล้ว';
+    } catch (err) {
+      statusEl.textContent = 'ผิดพลาด: ' + err.message;
+    }
+  });
+
+  // ---------- Reply box open/close + send ----------
+  function toggleReplyBox(commentId) {
+    const box = document.getElementById('reply-box-' + commentId);
+    if (!box) return;
+    if (!currentSession) {
+      openLoginModal();
+      return;
+    }
+    box.classList.toggle('open');
+  }
+
+  async function sendReply(commentId, pageName) {
+    const textarea = document.getElementById('reply-text-' + commentId);
+    const statusEl = document.getElementById('reply-status-' + commentId);
+    const message = textarea.value.trim();
+    if (!message) { statusEl.textContent = 'กรุณาพิมพ์ข้อความก่อน'; return; }
+    if (!currentSession) { statusEl.textContent = 'กรุณาเข้าสู่ระบบก่อน'; return; }
+
+    statusEl.textContent = 'กำลังส่ง...';
+    try {
+      const resp = await fetch(REPLY_FUNCTION_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({
+          comment_id: commentId,
+          message: message,
+          page_name: pageName,
+          access_token: currentSession.access_token,
+        }),
+      });
+      const data = await resp.json();
+      if (data.error) {
+        statusEl.textContent = 'ผิดพลาด: ' + (data.error.message || JSON.stringify(data.error));
+      } else {
+        statusEl.textContent = '✓ ส่งสำเร็จ โดย ' + data.replied_by;
+        textarea.value = '';
+        setTimeout(() => { document.getElementById('reply-box-' + commentId)?.classList.remove('open'); }, 1500);
+      }
+    } catch (err) {
+      statusEl.textContent = 'ผิดพลาด: ' + err.message;
+    }
+  }
+
+  // ---------- Mode tabs ----------
+  document.getElementById('modeTabs').addEventListener('click', (e) => {
+    const btn = e.target.closest('.mode-btn');
+    if (!btn) return;
+    document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentMode = btn.dataset.mode;
+    renderMain();
+  });
+
+  // ---------- Page tabs ----------
+  document.getElementById('pageTabs').addEventListener('click', (e) => {
+    const btn = e.target.closest('.tab-btn');
+    if (!btn) return;
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentPage = btn.dataset.page;
+    currentPostId = null;
+    renderSidebar();
+    renderMain();
+  });
+
+  document.getElementById('clearFilterBtn').addEventListener('click', () => {
+    currentPostId = null;
+    followedFilterActive = false;
+    renderSidebar();
+    renderMain();
+  });
+
+  // ---------- Search ----------
+  document.getElementById('searchInput').addEventListener('input', (e) => {
+    searchQuery = e.target.value.trim().toLowerCase();
+    renderSidebar();
+    if (currentMode === 'posts') renderMain();
+  });
+
+  // ---------- Helpers ----------
+  const EMPTY_ICON = `<svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="display:block;margin:0 auto;"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>`;
+  const BOOKMARK_ICON = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>`;
+  const ARCHIVE_ICON = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="2" y="4" width="20" height="5" rx="1"/><path d="M4 9v9a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9"/><path d="M10 13h4"/></svg>`;
+
+  function tagClass(pageName) { return pageName === 'Zone4' ? 'zone4' : 'tosm'; }
+  function timeAgo(iso) {
+    if (!iso) return '';
+    const diffMs = Date.now() - new Date(iso).getTime();
+    const mins = Math.floor(diffMs / 60000);
+    if (mins < 1) return 'เมื่อสักครู่';
+    if (mins < 60) return mins + ' นาทีที่แล้ว';
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return hrs + ' ชม.ที่แล้ว';
+    return Math.floor(hrs / 24) + ' วันที่แล้ว';
+  }
+  function fullDate(iso) {
+    if (!iso) return '';
+    return new Date(iso).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' });
+  }
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str || '';
+    return div.innerHTML;
+  }
+  const AVATAR_COLORS = ['#38bdf8', '#f97316', '#a78bfa', '#34d399', '#f472b6', '#facc15', '#fb7185', '#60a5fa'];
+  function colorForName(name) {
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+  }
+  function isAnonymous(name) { return !name || name === 'Unknown'; }
+  function renderAvatar(name) {
+    if (isAnonymous(name)) {
+      return `<div class="avatar generic"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.7 0 4.9-2.2 4.9-4.9S14.7 2.2 12 2.2 7.1 4.4 7.1 7.1 9.3 12 12 12zm0 2.4c-3.3 0-9.8 1.6-9.8 4.9v2.4h19.6v-2.4c0-3.3-6.5-4.9-9.8-4.9z"/></svg></div>`;
+    }
+    const initial = name.trim().charAt(0).toUpperCase();
+    return `<div class="avatar" style="background:${colorForName(name)}">${escapeHtml(initial)}</div>`;
+  }
+  function displayName(name) { return isAnonymous(name) ? 'ผู้ใช้ Facebook' : name; }
+
+  // ---------- Following (shared, backed by comment_follows table) ----------
+  let followCategories = {}; // comment_id -> category
+  async function loadFollows() {
+    const { data, error } = await supabaseClient.from('comment_follows').select('comment_id, category');
+    if (error) { console.error('loadFollows failed', error); return; }
+    followedIds = new Set((data || []).map(r => r.comment_id));
+    followCategories = {};
+    (data || []).forEach(r => { followCategories[r.comment_id] = r.category || 'ทั่วไป'; });
+  }
+  async function toggleFollow(commentId, category) {
+    const isFollowed = followedIds.has(commentId);
+    // Optimistic UI update
+    if (isFollowed) { followedIds.delete(commentId); delete followCategories[commentId]; }
+    else { followedIds.add(commentId); followCategories[commentId] = category || 'ทั่วไป'; }
+    if (currentMode === 'comments') renderFeed();
+
+    if (isFollowed) {
+      const { error } = await supabaseClient.from('comment_follows').delete().eq('comment_id', commentId);
+      if (error) { console.error('unfollow failed', error); followedIds.add(commentId); renderFeed(); }
+    } else {
+      const { error } = await supabaseClient.from('comment_follows').upsert({ comment_id: commentId, category: category || 'ทั่วไป' }, { onConflict: 'comment_id' });
+      if (error) { console.error('follow failed', error); followedIds.delete(commentId); renderFeed(); }
+    }
+  }
+  async function updateFollowCategory(commentId, category) {
+    followCategories[commentId] = category;
+    const { error } = await supabaseClient.from('comment_follows').update({ category }).eq('comment_id', commentId);
+    if (error) console.error('update follow category failed', error);
+  }
+  function subscribeFollowsRealtime() {
+    supabaseClient
+      .channel('comment-follows-feed')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'comment_follows' }, (payload) => {
+        followedIds.add(payload.new.comment_id);
+        if (currentMode === 'comments') renderFeed();
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'comment_follows' }, (payload) => {
+        followedIds.delete(payload.old.comment_id);
+        if (currentMode === 'comments') renderFeed();
+      })
+      .subscribe();
+  }
+
+  // ---------- Archive (shared, backed by comment_archives table) ----------
+  async function loadArchives() {
+    const { data, error } = await supabaseClient.from('comment_archives').select('comment_id');
+    if (error) { console.error('loadArchives failed', error); return; }
+    archivedIds = new Set((data || []).map(r => r.comment_id));
+  }
+  async function toggleArchive(commentId, pageName) {
+    if (!currentSession) {
+      openLoginModal();
+      return;
+    }
+    const isArchived = archivedIds.has(commentId);
+    // Optimistic UI update
+    if (isArchived) archivedIds.delete(commentId); else archivedIds.add(commentId);
+    if (currentMode === 'comments') renderFeed();
+
+    try {
+      const resp = await fetch(TOGGLE_ARCHIVE_FUNCTION_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY },
+        body: JSON.stringify({ comment_id: commentId, page_name: pageName, do_archive: !isArchived, access_token: currentSession.access_token }),
+      });
+      const data = await resp.json();
+      if (data.error) {
+        console.error('archive toggle failed', data.error);
+        if (isArchived) archivedIds.add(commentId); else archivedIds.delete(commentId);
+        if (currentMode === 'comments') renderFeed();
+        alert('ผิดพลาด: ' + (data.error.message || JSON.stringify(data.error)));
+      }
+    } catch (err) {
+      console.error('archive toggle failed', err);
+      if (isArchived) archivedIds.add(commentId); else archivedIds.delete(commentId);
+      if (currentMode === 'comments') renderFeed();
+    }
+  }
+  function subscribeArchivesRealtime() {
+    supabaseClient
+      .channel('comment-archives-feed')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'comment_archives' }, (payload) => {
+        archivedIds.add(payload.new.comment_id);
+        if (currentMode === 'comments') renderFeed();
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'comment_archives' }, (payload) => {
+        archivedIds.delete(payload.old.comment_id);
+        if (currentMode === 'comments') renderFeed();
+      })
+      .subscribe();
+  }
+  document.getElementById('archiveFilterToggle').addEventListener('click', () => {
+    showArchivedOnly = !showArchivedOnly;
+    document.getElementById('archiveFilterToggle').classList.toggle('on', showArchivedOnly);
+    document.getElementById('archiveFilterToggle').textContent = showArchivedOnly ? '🗄 กำลังดูคอมเมนต์ที่เก็บถาวร (คลิกเพื่อกลับ)' : '🗄 แสดงคอมเมนต์ที่เก็บถาวร';
+    renderFeed();
+  });
+
+  // ---------- Derive posts (from the dedicated posts table, not just comments) ----------
+  function getPostsForCurrentPage() {
+    const commentCounts = {};
+    allComments.forEach(c => { commentCounts[c.post_id] = (commentCounts[c.post_id] || 0) + 1; });
+
+    let list = allPosts
+      .filter(p => currentPage === 'all' || p.page_name === currentPage)
+      .map(p => ({
+        post_id: p.post_id,
+        page_name: p.page_name,
+        post_message: p.post_message,
+        post_permalink: p.post_permalink,
+        count: commentCounts[p.post_id] || 0,
+        latest: p.created_time,
+      }));
+
+    if (searchQuery) {
+      list = list.filter(p => (p.post_message || '').toLowerCase().includes(searchQuery));
+    }
+    return list.sort((a, b) => (b.latest || '').localeCompare(a.latest || ''));
+  }
+
+  function renderSidebar() {
+    const posts = getPostsForCurrentPage();
+    const list = document.getElementById('postList');
+    if (posts.length === 0) {
+      list.innerHTML = `<div class="empty" style="padding:20px 8px;">${EMPTY_ICON}ไม่พบโพสต์</div>`;
+      return;
+    }
+    list.innerHTML = posts.map(p => `
+      <div class="post-item ${currentPostId === p.post_id ? 'active' : ''}" data-post-id="${escapeHtml(p.post_id)}">
+        <div class="post-snippet">${escapeHtml(p.post_message || '(โพสต์ไม่มีข้อความ)')}</div>
+        <div class="post-meta">
+          <span class="post-tag ${tagClass(p.page_name)}">${escapeHtml(p.page_name)}</span>
+          <span>${p.count} คอมเมนต์</span>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  document.getElementById('postList').addEventListener('click', (e) => {
+    const item = e.target.closest('.post-item');
+    if (!item) return;
+    selectPost(item.dataset.postId);
+  });
+
+  function selectPost(postId) {
+    currentPostId = (currentPostId === postId) ? null : postId;
+    if (currentPostId) {
+      const post = allComments.find(c => c.post_id === currentPostId);
+      if (post) {
+        currentPage = post.page_name;
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.page === currentPage));
+      }
+      currentMode = 'comments';
+      document.querySelectorAll('.mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === 'comments'));
+    }
+    renderSidebar();
+    renderMain();
+  }
+
+  // ---------- Main render dispatch ----------
+  function renderMain() {
+    document.getElementById('archiveFilterToggle').style.display = currentMode === 'comments' ? 'inline-block' : 'none';
+    document.querySelector('.layout').classList.toggle('no-sidebar', currentMode === 'dashboard' || currentMode === 'audit' || currentMode === 'users');
+    document.getElementById('postList').style.display = currentMode === 'posts' ? 'none' : '';
+    document.querySelector('.sidebar-title').style.display = currentMode === 'posts' ? 'none' : '';
+    if (currentMode === 'posts') renderPostArchive();
+    else if (currentMode === 'dashboard') renderDashboard();
+    else if (currentMode === 'audit') renderAuditLog();
+    else if (currentMode === 'users') renderUsers();
+    else renderFeed();
+  }
+
+  function renderFeed() {
+    let filtered = allComments;
+    if (currentPage !== 'all') filtered = filtered.filter(c => c.page_name === currentPage);
+    if (currentPostId) filtered = filtered.filter(c => c.post_id === currentPostId);
+    if (followedFilterActive) filtered = filtered.filter(c => followedIds.has(c.comment_id));
+    filtered = filtered.filter(c => showArchivedOnly ? archivedIds.has(c.comment_id) : !archivedIds.has(c.comment_id));
+
+    const bar = document.getElementById('activeFilterBar');
+    if (currentPostId) {
+      const post = filtered[0];
+      document.getElementById('activeFilterText').innerHTML =
+        '📌 กำลังดูคอมเมนต์เฉพาะโพสต์: "' + escapeHtml((post && post.post_message || '').substring(0, 60)) + '..."';
+      bar.classList.add('show');
+    } else if (followedFilterActive) {
+      document.getElementById('activeFilterText').innerHTML = '🔖 กำลังดูเฉพาะคอมเมนต์ที่ติดตามอยู่';
+      bar.classList.add('show');
+    } else {
+      bar.classList.remove('show');
+    }
+
+    const feed = document.getElementById('feed');
+    if (filtered.length === 0) {
+      feed.innerHTML = `<div class="empty">${EMPTY_ICON}${showArchivedOnly ? 'ยังไม่มีคอมเมนต์ที่เก็บถาวร' : 'ยังไม่มีคอมเมนต์'}</div>`;
+      return;
+    }
+    feed.innerHTML = filtered.map(c => {
+      const followed = followedIds.has(c.comment_id);
+      const archived = archivedIds.has(c.comment_id);
+      return `
+      <div class="comment ${followed ? 'followed' : ''} ${archived ? 'archived' : ''}">
+        <div class="comment-top">
+          <div class="who">
+            ${renderAvatar(c.from_name)}
+            <span class="from ${isAnonymous(c.from_name) ? 'anonymous' : ''}">${escapeHtml(displayName(c.from_name))}</span>
+          </div>
+          <div class="comment-top-right">
+            <button class="reply-toggle-btn" data-comment-id="${escapeHtml(c.comment_id)}" data-page-name="${escapeHtml(c.page_name)}" title="ตอบกลับคอมเมนต์นี้">↩ ตอบกลับ</button>
+            ${followed ? `<select class="category-select follow-category-select" style="margin-top:0;width:auto;padding:4px 8px;font-size:11px;" data-comment-id="${escapeHtml(c.comment_id)}">
+              ${REPLY_CATEGORIES.map(cat => `<option value="${escapeHtml(cat)}" ${followCategories[c.comment_id] === cat ? 'selected' : ''}>${escapeHtml(cat)}</option>`).join('')}
+            </select>` : ''}
+            <button class="follow-btn ${followed ? 'on' : ''}" data-comment-id="${escapeHtml(c.comment_id)}" title="ติดตามคอมเมนต์นี้เพื่อติดตามปัญหา">
+              ${BOOKMARK_ICON}${followed ? 'กำลังติดตาม' : 'ติดตาม'}
+            </button>
+            <button class="archive-btn ${archived ? 'on' : ''}" data-comment-id="${escapeHtml(c.comment_id)}" data-page-name="${escapeHtml(c.page_name)}" title="${archived ? 'กู้คืนคอมเมนต์นี้' : 'เก็บถาวรคอมเมนต์นี้'}">
+              ${ARCHIVE_ICON}${archived ? 'กู้คืน' : 'เก็บถาวร'}
+            </button>
+            <span class="tag ${tagClass(c.page_name)}">${escapeHtml(c.page_name)}</span>
+          </div>
+        </div>
+        <div class="message">${escapeHtml(c.message)}</div>
+        ${c.attachment_url ? `<div class="comment-image"><a href="${escapeHtml(c.attachment_url)}" target="_blank" rel="noopener"><img src="${escapeHtml(c.attachment_url)}" loading="lazy" alt="รูปที่แนบมากับคอมเมนต์"></a></div>` : ''}
+        <div class="reply-box" id="reply-box-${escapeHtml(c.comment_id)}">
+          <textarea placeholder="พิมพ์ข้อความตอบกลับ..." id="reply-text-${escapeHtml(c.comment_id)}"></textarea>
+          <div class="reply-box-actions">
+            <span class="reply-status" id="reply-status-${escapeHtml(c.comment_id)}"></span>
+            <button class="reply-send-btn" data-comment-id="${escapeHtml(c.comment_id)}" data-page-name="${escapeHtml(c.page_name)}">ส่งคำตอบ</button>
+          </div>
+        </div>
+        <div class="meta">
+          <span class="time-block">
+            <span class="relative">${timeAgo(c.created_time)}</span>
+            <span class="absolute">${fullDate(c.created_time)}</span>
+          </span>
+          ${(c.comment_permalink || c.post_permalink) ? `<a href="${escapeHtml(c.comment_permalink || c.post_permalink)}" target="_blank" rel="noopener"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg>ดูบน Facebook</a>` : ''}
+        </div>
+      </div>
+    `;
+    }).join('');
+  }
+
+  document.getElementById('feed').addEventListener('change', (e) => {
+    const select = e.target.closest('.follow-category-select');
+    if (select) {
+      updateFollowCategory(select.dataset.commentId, select.value);
+    }
+  });
+
+  document.getElementById('feed').addEventListener('click', (e) => {
+    const replyToggleBtn = e.target.closest('.reply-toggle-btn');
+    if (replyToggleBtn) {
+      toggleReplyBox(replyToggleBtn.dataset.commentId);
+      return;
+    }
+    const replySendBtn = e.target.closest('.reply-send-btn');
+    if (replySendBtn) {
+      sendReply(replySendBtn.dataset.commentId, replySendBtn.dataset.pageName);
+      return;
+    }
+    const followBtn = e.target.closest('.follow-btn');
+    if (followBtn) {
+      toggleFollow(followBtn.dataset.commentId, 'ทั่วไป');
+      return;
+    }
+    const archiveBtn = e.target.closest('.archive-btn');
+    if (archiveBtn) {
+      toggleArchive(archiveBtn.dataset.commentId, archiveBtn.dataset.pageName);
+      return;
+    }
+    const viewBtn = e.target.closest('.view-comments-btn');
+    if (viewBtn) {
+      selectPost(viewBtn.dataset.postId);
+      return;
+    }
+    const topPostRow = e.target.closest('.top-post-row');
+    if (topPostRow) {
+      document.querySelectorAll('.mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === 'comments'));
+      currentMode = 'comments';
+      selectPost(topPostRow.dataset.postId);
+      return;
+    }
+    const quickLink = e.target.closest('.dash-quicklink');
+    if (quickLink) {
+      document.querySelectorAll('.mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === quickLink.dataset.mode));
+      currentMode = quickLink.dataset.mode;
+      followedFilterActive = quickLink.dataset.followFilter === 'true';
+      renderMain();
+    }
+  });
+
+  function renderPostArchive() {
+    document.getElementById('activeFilterBar').classList.remove('show');
+    const posts = getPostsForCurrentPage();
+    const feed = document.getElementById('feed');
+    if (posts.length === 0) {
+      feed.innerHTML = `<div class="empty">${EMPTY_ICON}ไม่พบโพสต์</div>`;
+      return;
+    }
+
+    function renderPostCard(p) {
+      return `
+      <div class="post-card">
+        <div class="post-card-top">
+          <span class="tag ${tagClass(p.page_name)}">${escapeHtml(p.page_name)}</span>
+          <span class="time-block" style="align-items:flex-end;">
+            <span class="relative" style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);">${timeAgo(p.latest)}</span>
+            <span class="absolute" style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted);opacity:0.75;">${fullDate(p.latest)}</span>
+          </span>
+        </div>
+        <div class="message">${escapeHtml(p.post_message || '(โพสต์ไม่มีข้อความ)')}</div>
+        <div class="post-card-footer">
+          <div class="left">
+            <span>💬 ${p.count} คอมเมนต์</span>
+          </div>
+          <div style="display:flex;gap:8px;">
+            ${p.post_permalink ? `<a href="${escapeHtml(p.post_permalink)}" target="_blank" rel="noopener" class="fb-btn"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg>ดูโพสต์ต้นฉบับ</a>` : ''}
+            <button class="view-comments-btn" data-post-id="${escapeHtml(p.post_id)}">ดูคอมเมนต์</button>
+          </div>
+        </div>
+      </div>`;
+    }
+
+    if (currentPage === 'all') {
+      // Group posts by page so Zone4 and TOSM 2026 are shown as separate sections.
+      const groups = {};
+      posts.forEach(p => { (groups[p.page_name] = groups[p.page_name] || []).push(p); });
+      const pageOrder = ['Zone4', 'TOSM 2026'];
+      const pageNames = [...pageOrder.filter(n => groups[n]), ...Object.keys(groups).filter(n => !pageOrder.includes(n))];
+      feed.innerHTML = pageNames.map(pageName => `
+        <div class="archive-section-title">
+          <span class="tag ${tagClass(pageName)}">${escapeHtml(pageName)}</span>
+          <span class="archive-section-count">${groups[pageName].length} โพสต์</span>
+        </div>
+        ${groups[pageName].map(renderPostCard).join('')}
+      `).join('');
+    } else {
+      feed.innerHTML = posts.map(renderPostCard).join('');
+    }
+  }
+
+  // ---------- Dashboard ----------
+  let dashStats = { totalComments: null, totalPosts: null, last24h: null, zone4Count: null, tosmCount: null };
+
+  async function loadDashboardStats() {
+    const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const [totalC, totalP, last24, zone4C, tosmC] = await Promise.all([
+      supabaseClient.from('comments').select('*', { count: 'exact', head: true }),
+      supabaseClient.from('posts').select('*', { count: 'exact', head: true }),
+      supabaseClient.from('comments').select('*', { count: 'exact', head: true }).gte('created_time', dayAgo),
+      supabaseClient.from('comments').select('*', { count: 'exact', head: true }).eq('page_name', 'Zone4'),
+      supabaseClient.from('comments').select('*', { count: 'exact', head: true }).eq('page_name', 'TOSM 2026'),
+    ]);
+    dashStats = {
+      totalComments: totalC.count,
+      totalPosts: totalP.count,
+      last24h: last24.count,
+      zone4Count: zone4C.count,
+      tosmCount: tosmC.count,
+    };
+    if (currentMode === 'dashboard') renderDashboard();
+  }
+
+  function renderDashboard() {
+    document.getElementById('activeFilterBar').classList.remove('show');
+    const feed = document.getElementById('feed');
+
+    const commentCounts = {};
+    allComments.forEach(c => { commentCounts[c.post_id] = (commentCounts[c.post_id] || 0) + 1; });
+    const topPosts = allPosts
+      .map(p => ({ ...p, count: commentCounts[p.post_id] || 0 }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+
+    const fmt = (n) => (n === null || n === undefined) ? '…' : n.toLocaleString('th-TH');
+
+    feed.innerHTML = `
+      <div class="dash-grid">
+        <div class="dash-card">
+          <div class="num">${fmt(dashStats.totalPosts)}</div>
+          <div class="label">📁 โพสต์ทั้งหมด</div>
+        </div>
+        <div class="dash-card">
+          <div class="num">${fmt(dashStats.totalComments)}</div>
+          <div class="label">💬 คอมเมนต์ทั้งหมด</div>
+        </div>
+        <div class="dash-card">
+          <div class="num">${fmt(dashStats.last24h)}</div>
+          <div class="label">🕐 คอมเมนต์ใน 24 ชม.ล่าสุด</div>
+        </div>
+        <div class="dash-card dash-quicklink" data-mode="comments" data-follow-filter="true" style="cursor:pointer;">
+          <div class="num">${followedIds.size}</div>
+          <div class="label">🔖 กำลังติดตาม (คลิกดูทั้งหมด)</div>
+        </div>
+        <div class="dash-card">
+          <div class="num">${archivedIds.size}</div>
+          <div class="label">🗄 เก็บถาวรแล้ว</div>
+        </div>
+      </div>
+
+      <div class="dash-section-title">แยกตามเพจ</div>
+      <div class="dash-breakdown">
+        <span class="dash-pill">Zone4: ${fmt(dashStats.zone4Count)} คอมเมนต์</span>
+        <span class="dash-pill">TOSM 2026: ${fmt(dashStats.tosmCount)} คอมเมนต์</span>
+      </div>
+
+      <div style="display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-top:20px;">
+        <div class="chart-card"><canvas id="trendChart"></canvas></div>
+        <div class="chart-card"><canvas id="pageSplitChart"></canvas></div>
+      </div>
+
+      <div class="dash-section-title">⚡ ทางลัด</div>
+      <div class="dash-breakdown">
+        <span class="dash-pill dash-quicklink" data-mode="audit" style="cursor:pointer;">📋 ดูบันทึกการตอบกลับ</span>
+        <span class="dash-pill dash-quicklink" data-mode="users" style="cursor:pointer;">👤 จัดการผู้ใช้งาน</span>
+      </div>
+
+      <div class="dash-section-title">🔥 โพสต์ที่มีคอมเมนต์เยอะที่สุด (จากข้อมูลล่าสุดที่โหลดในหน้านี้)</div>
+      ${topPosts.length === 0 ? `<div class="empty">${EMPTY_ICON}ยังไม่มีข้อมูล</div>` : topPosts.map(p => `
+        <div class="top-post-row" data-post-id="${escapeHtml(p.post_id)}">
+          <span class="tag ${tagClass(p.page_name)}" style="flex-shrink:0;">${escapeHtml(p.page_name)}</span>
+          <span class="snippet">${escapeHtml(p.post_message || '(โพสต์ไม่มีข้อความ)')}</span>
+          <span class="count">💬 ${p.count}</span>
+        </div>
+      `).join('')}
+    `;
+
+    if (window.Chart) {
+      const mutedColor = getComputedStyle(document.documentElement).getPropertyValue('--muted');
+      const textColor = getComputedStyle(document.documentElement).getPropertyValue('--text');
+      const borderColor = getComputedStyle(document.documentElement).getPropertyValue('--border');
+
+      // Trend: comments per day, last 14 days
+      const days = [];
+      const dayCounts = {};
+      for (let i = 13; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const key = d.toISOString().slice(0, 10);
+        days.push(key);
+        dayCounts[key] = 0;
+      }
+      allComments.forEach(c => {
+        if (!c.created_time) return;
+        const key = c.created_time.slice(0, 10);
+        if (key in dayCounts) dayCounts[key]++;
+      });
+      const trendCtx = document.getElementById('trendChart');
+      if (window._trendChartInstance) window._trendChartInstance.destroy();
+      window._trendChartInstance = new Chart(trendCtx, {
+        type: 'line',
+        data: {
+          labels: days.map(d => d.slice(5)),
+          datasets: [{
+            label: 'คอมเมนต์ต่อวัน',
+            data: days.map(d => dayCounts[d]),
+            borderColor: '#38bdf8',
+            backgroundColor: 'rgba(56,189,248,0.15)',
+            fill: true, tension: 0.3,
+          }],
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { display: false }, title: { display: true, text: 'แนวโน้มคอมเมนต์ 14 วันล่าสุด (จากข้อมูลที่โหลดในหน้านี้)', color: textColor } },
+          scales: {
+            x: { ticks: { color: mutedColor }, grid: { display: false } },
+            y: { ticks: { color: mutedColor, precision: 0 }, grid: { color: borderColor } },
+          },
+        },
+      });
+
+      // Page split doughnut
+      const splitCtx = document.getElementById('pageSplitChart');
+      if (window._pageSplitChartInstance) window._pageSplitChartInstance.destroy();
+      window._pageSplitChartInstance = new Chart(splitCtx, {
+        type: 'doughnut',
+        data: {
+          labels: ['Zone4', 'TOSM 2026'],
+          datasets: [{ data: [dashStats.zone4Count || 0, dashStats.tosmCount || 0], backgroundColor: ['#38bdf8', '#f97316'] }],
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { position: 'bottom', labels: { color: textColor } }, title: { display: true, text: 'สัดส่วนคอมเมนต์ตามเพจ', color: textColor } },
+        },
+      });
+    }
+  }
+
+  // ---------- Audit Log ----------
+  let auditData = [];
+  let auditCategoryFilter = 'all';
+  let emailNameMap = {}; // email -> display_name
+  const ACTION_LABELS = {
+    archive: 'เก็บถาวรคอมเมนต์',
+    unarchive: 'กู้คืนคอมเมนต์',
+    add_user: 'เพิ่มผู้ใช้งาน',
+    remove_user: 'ลบผู้ใช้งาน',
+    rename_user: 'แก้ไขชื่อผู้ใช้งาน',
+    change_role: 'เปลี่ยนสิทธิ์ผู้ใช้งาน',
+  };
+
+  function renderLoginGate(message) {
+    document.getElementById('activeFilterBar').classList.remove('show');
+    document.getElementById('archiveFilterToggle').style.display = 'none';
+    document.getElementById('feed').innerHTML = `
+      <div class="gate">
+        ${message}
+        <br><button id="gateLoginBtn">เข้าสู่ระบบ</button>
+      </div>
+    `;
+    document.getElementById('gateLoginBtn').addEventListener('click', openLoginModal);
+  }
+
+  async function renderAuditLog() {
+    document.getElementById('activeFilterBar').classList.remove('show');
+    if (!currentSession) {
+      renderLoginGate('กรุณาเข้าสู่ระบบก่อนเพื่อดูบันทึกการตอบกลับ');
+      return;
+    }
+    const feed = document.getElementById('feed');
+    feed.innerHTML = `<div class="empty">กำลังโหลด...</div>`;
+
+    const [replyRes, activityRes, namesRes] = await Promise.all([
+      supabaseClient.from('reply_audit_log').select('*').order('created_at', { ascending: false }).limit(300),
+      supabaseClient.from('activity_log').select('*').order('created_at', { ascending: false }).limit(300),
+      callManageEmails('list'),
+    ]);
+
+    if (replyRes.error || activityRes.error) {
+      feed.innerHTML = `<div class="empty">โหลดบันทึกไม่สำเร็จ</div>`;
+      console.error(replyRes.error || activityRes.error);
+      return;
+    }
+
+    emailNameMap = {};
+    (namesRes.emails || []).forEach(u => { if (u.display_name) emailNameMap[u.email] = u.display_name; });
+
+    const replyEntries = (replyRes.data || []).map(r => ({
+      type: 'reply',
+      category: r.category || 'ทั่วไป',
+      actor: r.replied_by_email,
+      page_name: r.page_name,
+      message: r.reply_message,
+      created_at: r.created_at,
+    }));
+
+    const activityEntries = (activityRes.data || []).map(r => {
+      let message = '';
+      if (r.action === 'archive' || r.action === 'unarchive') {
+        const relatedComment = allComments.find(c => c.comment_id === r.target);
+        message = relatedComment ? ('"' + (relatedComment.message || '').substring(0, 100) + '"') : ('comment_id: ' + r.target);
+      } else if (r.action === 'add_user') {
+        message = r.target + (r.detail ? ' (ชื่อ: ' + r.detail + ')' : '');
+      } else if (r.action === 'remove_user') {
+        message = r.target;
+      } else if (r.action === 'rename_user') {
+        message = r.target + ' → ตั้งชื่อเป็น "' + (r.detail || '') + '"';
+      } else if (r.action === 'change_role') {
+        message = r.target + ' → ' + (r.detail || '');
+      }
+      return {
+        type: 'activity',
+        category: ACTION_LABELS[r.action] || r.action,
+        actor: r.actor_email,
+        page_name: r.page_name,
+        message,
+        created_at: r.created_at,
+      };
+    });
+
+    auditData = [...replyEntries, ...activityEntries].sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
+    renderAuditContent();
+  }
+
+  function renderAuditContent() {
+    const feed = document.getElementById('feed');
+    const allCategories = [...REPLY_CATEGORIES, ...Object.values(ACTION_LABELS)];
+    const counts = {};
+    allCategories.forEach(c => { counts[c] = 0; });
+    auditData.forEach(r => { counts[r.category] = (counts[r.category] || 0) + 1; });
+
+    const filtered = auditCategoryFilter === 'all' ? auditData : auditData.filter(r => r.category === auditCategoryFilter);
+
+    feed.innerHTML = `
+      <div class="chart-card"><canvas id="categoryChart"></canvas></div>
+      <div class="audit-filters" id="auditFilters">
+        <span class="audit-filter-chip ${auditCategoryFilter === 'all' ? 'active' : ''}" data-cat="all">ทั้งหมด</span>
+        ${allCategories.map(c => `<span class="audit-filter-chip ${auditCategoryFilter === c ? 'active' : ''}" data-cat="${escapeHtml(c)}">${escapeHtml(c)}</span>`).join('')}
+      </div>
+      <div id="auditListContainer">
+        ${filtered.length === 0 ? `<div class="empty">${EMPTY_ICON}ไม่พบบันทึกในหมวดนี้</div>` : filtered.map(r => `
+          <div class="audit-row">
+            <div class="audit-row-top">
+              <span class="audit-email">${escapeHtml(emailNameMap[r.actor] || r.actor || 'ไม่ทราบ')}</span>
+              <span style="display:flex;gap:6px;align-items:center;">
+                <span class="category-tag">${escapeHtml(r.category)}</span>
+                ${r.page_name ? `<span class="tag ${tagClass(r.page_name)}">${escapeHtml(r.page_name)}</span>` : ''}
+              </span>
+            </div>
+            <div class="audit-message">${escapeHtml(r.message)}</div>
+            <div class="audit-time">${fullDate(r.created_at)} · ${timeAgo(r.created_at)}</div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+
+    document.getElementById('auditFilters').addEventListener('click', (e) => {
+      const chip = e.target.closest('.audit-filter-chip');
+      if (!chip) return;
+      auditCategoryFilter = chip.dataset.cat;
+      renderAuditContent();
+    });
+
+    if (window.Chart) {
+      const ctx = document.getElementById('categoryChart');
+      if (window._categoryChartInstance) window._categoryChartInstance.destroy();
+      window._categoryChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: allCategories,
+          datasets: [{ label: 'จำนวน', data: allCategories.map(c => counts[c] || 0), backgroundColor: '#a78bfa' }],
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { display: false }, title: { display: true, text: 'กิจกรรมตามหมวดหมู่', color: getComputedStyle(document.documentElement).getPropertyValue('--text') } },
+          scales: {
+            x: { ticks: { color: getComputedStyle(document.documentElement).getPropertyValue('--muted'), maxRotation: 40, minRotation: 40 }, grid: { display: false } },
+            y: { ticks: { color: getComputedStyle(document.documentElement).getPropertyValue('--muted'), precision: 0 }, grid: { color: getComputedStyle(document.documentElement).getPropertyValue('--border') } },
+          },
+        },
+      });
+    }
+  }
+
+  // ---------- User Management ----------
+  async function renderUsers() {
+    document.getElementById('activeFilterBar').classList.remove('show');
+    if (!currentSession) {
+      renderLoginGate('กรุณาเข้าสู่ระบบก่อนเพื่อจัดการรายชื่อผู้ใช้งาน');
+      return;
+    }
+    const feed = document.getElementById('feed');
+    feed.innerHTML = `<div class="empty">กำลังโหลด...</div>`;
+
+    const listResult = await callManageEmails('list');
+    if (listResult.error) {
+      if (listResult.error === 'not_admin' || (listResult.error.message && listResult.error.message === 'not_admin')) {
+        feed.innerHTML = `<div class="gate">🔒 ส่วนนี้เข้าถึงได้เฉพาะแอดมินเท่านั้น</div>`;
+      } else {
+        feed.innerHTML = `<div class="empty">โหลดรายชื่อไม่สำเร็จ: ${escapeHtml(listResult.error.message || JSON.stringify(listResult.error))}</div>`;
+      }
+      return;
+    }
+
+    feed.innerHTML = `
+      <div class="add-email-row">
+        <input type="email" id="newUserEmailInput" placeholder="เพิ่มอีเมลใหม่...">
+        <input type="text" id="newUserNameInput" placeholder="ชื่อเรียก (ไม่บังคับ)" style="max-width:160px;">
+        <select id="newUserRoleInput" class="category-select" style="margin-top:0;width:auto;">
+          <option value="member">Member</option>
+          <option value="administrator">Administrator</option>
+        </select>
+        <button id="addUserBtn">เพิ่ม</button>
+      </div>
+      <div id="userListContainer"></div>
+    `;
+    document.getElementById('addUserBtn').addEventListener('click', addAllowedEmail);
+    renderUserListFromData(listResult.emails || []);
+  }
+
+  async function callManageEmails(action, email, name, role) {
+    const resp = await fetch(MANAGE_EMAILS_FUNCTION_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY },
+      body: JSON.stringify({ action, email, name, role, access_token: currentSession.access_token }),
+    });
+    return resp.json();
+  }
+
+  async function loadAndRenderUserList() {
+    const container = document.getElementById('userListContainer');
+    const data = await callManageEmails('list');
+    if (data.error) {
+      container.innerHTML = `<div class="empty">โหลดรายชื่อไม่สำเร็จ: ${escapeHtml(data.error.message || JSON.stringify(data.error))}</div>`;
+      return;
+    }
+    renderUserListFromData(data.emails || []);
+  }
+
+  function renderUserListFromData(emails) {
+    const container = document.getElementById('userListContainer');
+    if (emails.length === 0) {
+      container.innerHTML = `<div class="empty">ยังไม่มีผู้ใช้งานที่ได้รับอนุญาต</div>`;
+      return;
+    }
+    container.innerHTML = emails.map(u => `
+      <div class="user-row">
+        <span>
+          <span class="email">${u.role === 'administrator' ? '👑 Administrator — ' : '👤 Member — '}${escapeHtml(u.display_name ? u.display_name + ' — ' : '')}${escapeHtml(u.email)}</span>
+          <span class="added-at">เพิ่มเมื่อ ${fullDate(u.added_at)}</span>
+        </span>
+        <span style="display:flex;gap:6px;">
+          <button class="remove-user-btn" data-email="${escapeHtml(u.email)}" data-role="${escapeHtml(u.role)}" data-name="${escapeHtml(u.display_name || '')}" data-action="togglerole" style="color:var(--muted);">${u.role === 'administrator' ? 'ลดเป็น Member' : 'ตั้งเป็น Admin'}</button>
+          <button class="remove-user-btn" data-email="${escapeHtml(u.email)}" data-role="${escapeHtml(u.role)}" data-name="${escapeHtml(u.display_name || '')}" data-action="rename" style="color:var(--muted);">แก้ชื่อ</button>
+          <button class="remove-user-btn" data-email="${escapeHtml(u.email)}" data-action="remove">ลบ</button>
+        </span>
+      </div>
+    `).join('');
+    container.querySelectorAll('[data-action="remove"]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!confirm('ลบสิทธิ์ของ ' + btn.dataset.email + ' ใช่ไหม?')) return;
+        btn.disabled = true;
+        const result = await callManageEmails('remove', btn.dataset.email);
+        if (result.error) { alert('ผิดพลาด: ' + (result.error.message || JSON.stringify(result.error))); btn.disabled = false; return; }
+        loadAndRenderUserList();
+      });
+    });
+    container.querySelectorAll('[data-action="rename"]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const newName = prompt('ตั้งชื่อเรียกใหม่สำหรับ ' + btn.dataset.email, btn.dataset.name || '');
+        if (newName === null) return;
+        // Pass the existing role too — 'add' is a full upsert, so omitting it would silently reset the role to member.
+        const result = await callManageEmails('add', btn.dataset.email, newName, btn.dataset.role);
+        if (result.error) { alert('ผิดพลาด: ' + (result.error.message || JSON.stringify(result.error))); return; }
+        loadAndRenderUserList();
+      });
+    });
+    container.querySelectorAll('[data-action="togglerole"]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const newRole = btn.dataset.role === 'administrator' ? 'member' : 'administrator';
+        if (!confirm('เปลี่ยนสิทธิ์ของ ' + btn.dataset.email + ' เป็น ' + newRole + ' ใช่ไหม?')) return;
+        btn.disabled = true;
+        // Pass the existing name too — otherwise the upsert would wipe it.
+        const result = await callManageEmails('add', btn.dataset.email, btn.dataset.name, newRole);
+        if (result.error) { alert('ผิดพลาด: ' + (result.error.message || JSON.stringify(result.error))); btn.disabled = false; return; }
+        loadAndRenderUserList();
+      });
+    });
+  }
+
+  async function addAllowedEmail() {
+    const input = document.getElementById('newUserEmailInput');
+    const nameInput = document.getElementById('newUserNameInput');
+    const roleInput = document.getElementById('newUserRoleInput');
+    const email = input.value.trim().toLowerCase();
+    if (!email || !email.includes('@')) { alert('กรุณากรอกอีเมลให้ถูกต้อง'); return; }
+    const result = await callManageEmails('add', email, nameInput.value.trim(), roleInput.value);
+    if (result.error) { alert('ผิดพลาด: ' + (result.error.message || JSON.stringify(result.error))); return; }
+    input.value = '';
+    nameInput.value = '';
+    loadAndRenderUserList();
+  }
+
+  // ---------- Data loading ----------
+  async function loadInitial() {
+    const [commentsRes, postsRes] = await Promise.all([
+      supabaseClient.from('comments').select('*').order('created_time', { ascending: false }).limit(1500),
+      supabaseClient.from('posts').select('*').order('created_time', { ascending: false }).limit(800),
+    ]);
+
+    if (commentsRes.error || postsRes.error) {
+      document.getElementById('statusText').textContent = 'โหลดข้อมูลไม่สำเร็จ';
+      console.error(commentsRes.error || postsRes.error);
+      return;
+    }
+    allComments = commentsRes.data || [];
+    allPosts = postsRes.data || [];
+    renderSidebar();
+    renderMain();
+    document.getElementById('statusText').textContent = 'อัปเดตล่าสุด ' + new Date().toLocaleTimeString('th-TH');
+  }
+
+  function subscribeRealtime() {
+    supabaseClient
+      .channel('comments-feed')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'comments' }, (payload) => {
+        allComments.unshift(payload.new);
+        if (allComments.length > 1500) allComments.pop();
+        renderSidebar();
+        renderMain();
+        document.getElementById('statusText').textContent = 'คอมเมนต์ใหม่ ' + new Date().toLocaleTimeString('th-TH');
+        if (isNotifyEnabled()) {
+          playBeep();
+          showCommentNotification(payload.new);
+        }
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'posts' }, (payload) => {
+        if (!allPosts.some(p => p.post_id === payload.new.post_id)) {
+          allPosts.unshift(payload.new);
+          if (allPosts.length > 800) allPosts.pop();
+          renderSidebar();
+          if (currentMode === 'posts' || currentMode === 'dashboard') renderMain();
+        }
+      })
+      .subscribe();
+  }
+
+  loadFollows().then(subscribeFollowsRealtime);
+  loadArchives().then(subscribeArchivesRealtime);
+  loadInitial();
+  subscribeRealtime();
+  loadDashboardStats();
+
+  // Safety-net full refresh every 5 minutes — catches anything the realtime
+  // websocket might have missed (e.g. brief disconnects) and picks up
+  // backend UPDATEs (like backfilled permalinks) that INSERT-only realtime won't.
+  setInterval(() => { loadInitial(); loadDashboardStats(); }, 5 * 60 * 1000);
+</script>
+
+</body>
+</html>
