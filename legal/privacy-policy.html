@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Privacy Policy — EXE FB Monitoring</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Prompt', sans-serif; max-width: 760px; margin: 0 auto; padding: 40px 20px 80px; line-height: 1.7; color: #1a1a1a; background: #fff; }
+  h1 { font-size: 26px; margin-bottom: 4px; }
+  h2 { font-size: 19px; margin-top: 36px; border-bottom: 1px solid #e2e2e2; padding-bottom: 6px; }
+  .updated { color: #666; font-size: 14px; margin-bottom: 32px; }
+  .th { color: #555; font-size: 14.5px; background: #f7f7f8; padding: 10px 14px; border-radius: 8px; margin: 10px 0 20px; }
+  ul { padding-left: 22px; }
+  li { margin-bottom: 6px; }
+  a { color: #1877F2; }
+</style>
+</head>
+<body>
+
+<h1>Privacy Policy</h1>
+<div class="updated">EXE FB Monitoring (also known internally as "EZComment") — Last updated: September 2026</div>
+
+<p>This Privacy Policy explains how EXE FB Monitoring ("the App", "we", "us") collects, uses, and protects information when our internal team uses it to monitor and respond to comments on our Facebook Pages (Zone4 Extreme and TOSM 2026).</p>
+<div class="th">สรุปภาษาไทย: หน้านี้อธิบายว่าระบบ EXE FB Monitoring เก็บและใช้ข้อมูลอะไรบ้าง เมื่อทีมงานของเราใช้เพื่อติดตามและตอบกลับคอมเมนต์บนเพจ Facebook (Zone4 Extreme และ TOSM 2026)</div>
+
+<h2>1. Who this App is for</h2>
+<p>This App is an internal tool used only by our own team members (Page administrators and staff) to monitor comments on Facebook Pages we own and manage. It is not a public-facing consumer product.</p>
+
+<h2>2. Information We Collect</h2>
+<ul>
+  <li><strong>Public Facebook Page content:</strong> posts and comments on our own Facebook Pages, retrieved via the Facebook Graph API using a Page-level System User access token.</li>
+  <li><strong>Public commenter information:</strong> where Facebook makes it available, the commenter's display name, comment text, timestamp, and any photo/sticker attached to the comment. We do not request or store any commenter's private profile data, contact details, or friend lists.</li>
+  <li><strong>Team member accounts:</strong> the email address of each authorized staff member, used to sign in to the internal dashboard, plus an optional display name they set for themselves.</li>
+  <li><strong>Activity logs:</strong> a record of actions our own staff take inside the dashboard (e.g. replying to a comment, archiving a comment, adding/removing a team member), including which staff email performed the action and when.</li>
+</ul>
+
+<h2>3. How We Use Information</h2>
+<ul>
+  <li>To display comments and posts from our own Facebook Pages in an internal dashboard, so our team can monitor player/customer feedback.</li>
+  <li>To allow authorized staff to reply to comments on our Facebook Pages directly from the dashboard.</li>
+  <li>To maintain an internal audit trail of who replied to, archived, or otherwise acted on a comment, for accountability within our own team.</li>
+  <li>To control which staff members are permitted to access the dashboard (via an internal allow-list of email addresses).</li>
+</ul>
+
+<h2>4. What We Do Not Do</h2>
+<ul>
+  <li>We do not sell, rent, or share any collected data with third parties.</li>
+  <li>We do not use commenter data for advertising or profiling.</li>
+  <li>We do not access Facebook Pages other than the ones our organization owns and administers.</li>
+  <li>We do not collect data from Facebook users beyond what is publicly visible on our own Pages' posts and comments.</li>
+</ul>
+
+<h2>5. Data Storage and Security</h2>
+<p>Data is stored in a Supabase (PostgreSQL) database with access restricted by authentication and row-level security policies. Communication with the Facebook Graph API is authenticated and request-signed (via appsecret_proof). Only authorized team members (verified by email login) can view the dashboard or use the reply feature.</p>
+
+<h2>6. Data Retention</h2>
+<p>Comment and post data is retained to maintain a historical record of engagement on our Pages. Team members may request deletion of specific data at any time — see our <a href="./data-deletion.html">Data Deletion Instructions</a>.</p>
+
+<h2>7. Third-Party Services</h2>
+<p>We use Facebook's Graph API to read and reply to comments on our own Pages, and Supabase for data storage and authentication. No data collected through this App is shared with any other third party.</p>
+
+<h2>8. Changes to This Policy</h2>
+<p>We may update this policy from time to time. The "Last updated" date above will reflect the most recent revision.</p>
+
+<h2>9. Contact</h2>
+<p>For questions about this policy or to request data deletion, please contact kadid.game@outlook.com managing this App.</p>
+
+</body>
+</html>
