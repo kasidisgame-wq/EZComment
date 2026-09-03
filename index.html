@@ -370,6 +370,16 @@
   .post-tag.zone4 { background: rgba(56,189,248,0.15); color: var(--zone4); }
   .post-tag.tosm { background: rgba(249,115,22,0.15); color: var(--tosm); }
   .post-tag.discord { background: rgba(88,101,242,0.15); color: var(--discord); }
+  .edited-tag {
+    font-family: 'Prompt', sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: rgba(251,191,36,0.15);
+    color: var(--follow);
+    white-space: nowrap;
+  }
 
   main { flex: 1; max-width: 860px; margin: 0 auto; padding: 20px 20px 60px; min-width: 0; }
   .layout.no-sidebar aside { display: none; }
@@ -1608,6 +1618,23 @@
       console.error('OS notification failed (toast shown instead)', err);
     }
   }
+  // Edits reuse the same toast-first path as new items, just with wording
+  // that makes clear the text changed rather than something new arriving.
+  function showEditNotification(title, body, url) {
+    const snippet = (body || '').substring(0, 100);
+    showToast('✏️ ' + title + '\n' + snippet, 'info', 8000, url ? () => window.open(url, '_blank') : null);
+    if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+    try {
+      const n = new Notification('✏️ ' + title, { body: snippet });
+      n.onclick = () => {
+        window.focus();
+        if (url) window.open(url, '_blank');
+        n.close();
+      };
+    } catch (err) {
+      console.error('OS notification failed (toast shown instead)', err);
+    }
+  }
   document.getElementById('notifyToggle').addEventListener('click', async () => {
     if (isNotifyEnabled()) {
       localStorage.setItem(NOTIFY_KEY, 'off');
@@ -2213,6 +2240,7 @@
               ${ARCHIVE_ICON}${archived ? 'กู้คืน' : 'เก็บถาวร'}
             </button>
             <span class="tag ${tagClass(c.page_name)}">${escapeHtml(c.page_name)}</span>
+            ${c.edited_at ? `<span class="edited-tag" title="แก้ไขล่าสุด ${escapeHtml(fullDate(c.edited_at))}">✏️ แก้ไขแล้ว</span>` : ''}
           </div>
         </div>
         <div class="message">${escapeHtml(c.message)}</div>
@@ -2571,6 +2599,7 @@
           <div class="comment-top-right">
             ${m.guild_name ? `<span class="post-tag" style="text-transform:none;background:${hexToRgba(discordServerColor(m.guild_name), 0.15)};color:${discordServerColor(m.guild_name)};">${escapeHtml(m.guild_name)}</span>` : ''}
             <span class="tag discord">#${escapeHtml(m.channel_name || 'unknown')}</span>
+            ${m.edited_at ? `<span class="edited-tag" title="แก้ไขล่าสุด ${escapeHtml(fullDate(m.edited_at))}">✏️ แก้ไขแล้ว</span>` : ''}
             <button class="archive-btn ${archived ? 'on' : ''}" data-message-id="${escapeHtml(m.message_id)}" title="${archived ? 'กู้คืนข้อความนี้' : 'เก็บถาวรข้อความนี้'}">
               ${ARCHIVE_ICON}${archived ? 'กู้คืน' : 'เก็บถาวร'}
             </button>
@@ -2625,6 +2654,21 @@
         if (isNotifyEnabled()) {
           playDiscordBeep();
           showDiscordNotification(payload.new);
+        }
+      })
+      // Discord edits land here once the bot's MessageUpdate handler writes them.
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'discord_messages' }, (payload) => {
+        const idx = allDiscordMessages.findIndex(m => m.message_id === payload.new.message_id);
+        if (idx === -1) return;
+        const textChanged = allDiscordMessages[idx].content !== payload.new.content;
+        allDiscordMessages[idx] = payload.new;
+        if (currentMode === 'discord') { renderDiscordChannelSidebar(); renderDiscordFeed(); }
+        if (!textChanged) return;
+        bumpUnread('discord');
+        if (isNotifyEnabled()) {
+          playDiscordBeep();
+          showEditNotification('ข้อความ Discord ถูกแก้ไข — #' + (payload.new.channel_name || 'unknown'),
+            (payload.new.author_name ? payload.new.author_name + ': ' : '') + (payload.new.content || ''), null);
         }
       })
       .subscribe();
@@ -3215,6 +3259,24 @@
           showCommentNotification(payload.new);
         }
       })
+      // Edits to an existing comment arrive as UPDATE, not INSERT. Without
+      // this the feed kept showing the original text indefinitely.
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'comments' }, (payload) => {
+        const idx = allComments.findIndex(c => c.comment_id === payload.new.comment_id);
+        if (idx === -1) return;
+        const textChanged = allComments[idx].message !== payload.new.message;
+        allComments[idx] = payload.new;
+        renderSidebar();
+        renderMain();
+        if (!textChanged) return;   // permalink backfills etc. shouldn't alert anyone
+        document.getElementById('statusText').textContent = 'คอมเมนต์ถูกแก้ไข ' + new Date().toLocaleTimeString('th-TH');
+        bumpUnread('comments');
+        if (isNotifyEnabled()) {
+          playFacebookBeep();
+          showEditNotification('คอมเมนต์ถูกแก้ไข — ' + (payload.new.page_name || ''), payload.new.message,
+            payload.new.comment_permalink || payload.new.post_permalink);
+        }
+      })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'posts' }, (payload) => {
         if (!allPosts.some(p => p.post_id === payload.new.post_id)) {
           allPosts.unshift(payload.new);
@@ -3222,6 +3284,13 @@
           renderSidebar();
           if (currentMode === 'posts' || currentMode === 'dashboard') renderMain();
         }
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'posts' }, (payload) => {
+        const idx = allPosts.findIndex(p => p.post_id === payload.new.post_id);
+        if (idx === -1) return;
+        allPosts[idx] = payload.new;
+        renderSidebar();
+        if (currentMode === 'posts' || currentMode === 'dashboard') renderMain();
       })
       .subscribe();
   }
