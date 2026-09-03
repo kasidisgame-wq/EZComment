@@ -1035,45 +1035,47 @@
       osc.stop(ctx.currentTime + 0.35);
     } catch (e) { console.error('beep failed', e); }
   }
-  // Short two-note rising "pop" — the kind of chime chat apps like FB Messenger use.
+  // Three-note rising "pop" (bright major-arpeggio feel) — the kind of chime chat apps like FB Messenger use.
   function playFacebookBeep() {
     try {
       const ctx = getAudioCtx();
       if (ctx.state === 'suspended') ctx.resume();
       const now = ctx.currentTime;
-      [660, 880].forEach((freq, i) => {
+      [523, 659, 880].forEach((freq, i) => {
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         osc.type = 'sine';
         osc.frequency.value = freq;
-        const t = now + i * 0.09;
+        const t = now + i * 0.085;
         gain.gain.setValueAtTime(0.001, t);
-        gain.gain.linearRampToValueAtTime(0.2, t + 0.02);
-        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+        gain.gain.linearRampToValueAtTime(0.38, t + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.26);
         osc.connect(gain).connect(ctx.destination);
         osc.start(t);
-        osc.stop(t + 0.2);
+        osc.stop(t + 0.28);
       });
     } catch (e) { console.error('fb beep failed', e); }
   }
-  // Short two-note descending "ding" with a rounder tone — the kind of chime Discord uses.
+  // Three-note descending "ding" with a deeper closing note (rounder, gong-like feel) — the kind of chime Discord uses.
   function playDiscordBeep() {
     try {
       const ctx = getAudioCtx();
       if (ctx.state === 'suspended') ctx.resume();
       const now = ctx.currentTime;
-      [988, 740].forEach((freq, i) => {
+      [988, 740, 494].forEach((freq, i) => {
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         osc.type = 'triangle';
         osc.frequency.value = freq;
-        const t = now + i * 0.11;
+        const t = now + i * 0.1;
+        const peak = i === 2 ? 0.34 : 0.4;
+        const tail = i === 2 ? 0.42 : 0.26;
         gain.gain.setValueAtTime(0.001, t);
-        gain.gain.linearRampToValueAtTime(0.22, t + 0.015);
-        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
+        gain.gain.linearRampToValueAtTime(peak, t + 0.015);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + tail);
         osc.connect(gain).connect(ctx.destination);
         osc.start(t);
-        osc.stop(t + 0.24);
+        osc.stop(t + tail + 0.02);
       });
     } catch (e) { console.error('discord beep failed', e); }
   }
@@ -2666,11 +2668,12 @@
     loadDiscordMessages();
     loadDiscordDashboardStats();
     subscribeDiscordRealtime();
-
-    // Safety-net full refresh every 5 minutes — catches anything the realtime
-    // websocket might have missed (e.g. brief disconnects) and picks up
-    // backend UPDATEs (like backfilled permalinks) that INSERT-only realtime won't.
-    setInterval(() => { loadInitial(); loadDashboardStats(); loadDiscordMessages(); loadDiscordDashboardStats(); }, 5 * 60 * 1000);
+    // No blind periodic timer here anymore — the feed now only updates when
+    // realtime actually pushes something new (which also fires the sound/
+    // notification), so the page stops "refreshing" for no reason. The
+    // focus/visibility/online-triggered resyncNow() below is what catches a
+    // silently-dropped connection instead, and only runs when the person
+    // returns to the tab or the network reconnects.
   }
 
   // A realtime websocket that's been sitting idle for a long time (tab in the
