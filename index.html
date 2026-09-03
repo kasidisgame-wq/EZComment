@@ -817,11 +817,134 @@
   }
   .archive-filter-toggle.on { background: rgba(239,68,68,0.15); border-color: #ef4444; color: #ef4444; }
 
+  /* ---------- Toast notifications ---------- */
+  #toastWrap {
+    position: fixed;
+    right: 18px;
+    bottom: 18px;
+    z-index: 200;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-end;
+    pointer-events: none;
+  }
+  .toast {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--muted);
+    border-radius: 10px;
+    padding: 11px 15px;
+    font-family: 'Prompt', sans-serif;
+    font-size: 13px;
+    color: var(--text);
+    box-shadow: var(--shadow-hover);
+    max-width: 340px;
+    animation: toastIn 0.2s ease;
+    pointer-events: auto;
+  }
+  .toast.error { border-left-color: #ef4444; }
+  .toast.success { border-left-color: var(--accent); }
+  .toast.info { border-left-color: var(--zone4); }
+  @keyframes toastIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ---------- Unread badge on mode tabs ---------- */
+  .mode-badge {
+    display: none;
+    min-width: 17px;
+    height: 17px;
+    padding: 0 5px;
+    border-radius: 999px;
+    background: #ef4444;
+    color: white;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 17px;
+    text-align: center;
+    margin-left: 6px;
+    vertical-align: 1px;
+  }
+  .mode-badge.show { display: inline-block; }
+
+  /* ---------- Load more ---------- */
+  .load-more-btn {
+    display: block;
+    width: 100%;
+    margin: 6px 0 20px;
+    padding: 11px;
+    border-radius: 10px;
+    border: 1px dashed var(--border);
+    background: var(--panel);
+    color: var(--muted);
+    font-family: 'Prompt', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+  }
+  .load-more-btn:hover { background: var(--panel-hover); color: var(--text); border-color: var(--muted); }
+
+  /* ---------- Mobile sidebar drawer ---------- */
+  .mobile-menu-btn {
+    display: none;
+    align-items: center;
+    gap: 6px;
+    font-family: 'Prompt', sans-serif;
+    font-weight: 600;
+    font-size: 13px;
+    padding: 7px 13px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--panel);
+    color: var(--text);
+    cursor: pointer;
+  }
+  .sidebar-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 55;
+  }
+  .sidebar-backdrop.show { display: block; }
+
   @media (max-width: 800px) {
-    aside { display: none; }
     .header-top { grid-template-columns: auto auto; }
     .brand-center { display: none; }
     .dash-grid + div[style] { grid-template-columns: 1fr !important; }
+    .header-bottom { padding-bottom: 12px; }
+    .mode-tabs { flex-wrap: wrap; }
+    .mode-btn { padding: 7px 11px; font-size: 12.5px; }
+
+    /* The sidebar used to be hidden outright on phones, which made it
+       impossible to filter by post or pick a Discord server/channel.
+       It's now a slide-in drawer opened by the ☰ button instead. */
+    .mobile-menu-btn { display: flex; }
+    aside {
+      position: fixed;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 86%;
+      max-width: 340px;
+      height: 100vh;
+      z-index: 60;
+      transform: translateX(-100%);
+      transition: transform 0.22s ease;
+      background: var(--bg);
+      border-right: 1px solid var(--border);
+      box-shadow: 4px 0 24px rgba(0,0,0,0.4);
+      padding-top: 16px;
+    }
+    aside.open { transform: translateX(0); }
+    .layout.no-sidebar .mobile-menu-btn { display: none; }
+    main { padding: 16px 14px 60px; }
+    .comment-top { flex-wrap: wrap; gap: 8px; }
+    .comment-top-right { flex-wrap: wrap; }
   }
 </style>
 </head>
@@ -867,26 +990,35 @@
       </button>
       <button class="mode-btn active" data-mode="comments">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:5px;"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
-        Facebook
+        Facebook<span class="mode-badge" id="badgeComments"></span>
       </button>
       <button class="mode-btn" data-mode="discord">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:5px;"><path d="M4 9h16M4 15h16M10 3L8 21M16 3l-2 18"/></svg>
-        Discord
+        Discord<span class="mode-badge" id="badgeDiscord"></span>
       </button>
     </div>
-    <div class="tabs" id="pageTabs">
-      <button class="tab-btn active" data-page="all">ทั้งหมด</button>
-      <button class="tab-btn" data-page="Zone4">Zone4</button>
-      <button class="tab-btn" data-page="TOSM 2026">TOSM 2026</button>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <button class="mobile-menu-btn" id="mobileMenuBtn" title="เปิดรายการด้านข้าง">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        รายการ
+      </button>
+      <div class="tabs" id="pageTabs">
+        <button class="tab-btn active" data-page="all">ทั้งหมด</button>
+        <button class="tab-btn" data-page="Zone4">Zone4</button>
+        <button class="tab-btn" data-page="TOSM 2026">TOSM 2026</button>
+      </div>
     </div>
   </div>
 </header>
+
+<div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+<div id="toastWrap"></div>
 
 <div class="layout">
   <aside>
     <div class="search-box" id="searchBoxWrap">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-      <input type="text" id="searchInput" placeholder="ค้นหาโพสต์...">
+      <input type="text" id="searchInput" placeholder="ค้นหาโพสต์ / คอมเมนต์ / ชื่อคน...">
     </div>
     <div class="archive-page-toggle" id="archivePageToggle">
       <button class="archive-page-btn" data-page="Zone4">Zone4</button>
@@ -994,6 +1126,10 @@
   let currentPostId = null;
   let currentMode = 'comments'; // 'comments' | 'posts' | 'discord' | 'dashboard' | 'audit' | 'users'
   let searchQuery = '';
+  const FEED_PAGE_SIZE = 60;
+  let feedRenderLimit = FEED_PAGE_SIZE;        // how many FB comments are currently drawn
+  let discordRenderLimit = FEED_PAGE_SIZE;     // how many Discord messages are currently drawn
+  let unreadCounts = { comments: 0, discord: 0 };
   let appInitialized = false;
   let hasLoadedCommentsOnce = false;
   let hasLoadedDiscordOnce = false;
@@ -1010,6 +1146,117 @@
   document.getElementById('themeToggle').addEventListener('click', () => {
     applyTheme(document.documentElement.classList.contains('light') ? 'dark' : 'light');
   });
+
+  function resetFeedPaging() {
+    feedRenderLimit = FEED_PAGE_SIZE;
+    discordRenderLimit = FEED_PAGE_SIZE;
+  }
+
+  // ---------- Mobile sidebar drawer ----------
+  function openMobileSidebar() {
+    document.querySelector('aside').classList.add('open');
+    document.getElementById('sidebarBackdrop').classList.add('show');
+  }
+  function closeMobileSidebar() {
+    document.querySelector('aside').classList.remove('open');
+    document.getElementById('sidebarBackdrop').classList.remove('show');
+  }
+  document.getElementById('mobileMenuBtn').addEventListener('click', openMobileSidebar);
+  document.getElementById('sidebarBackdrop').addEventListener('click', closeMobileSidebar);
+
+  // ---------- Keep "5 นาทีที่แล้ว" honest without redrawing the feed ----------
+  setInterval(() => {
+    document.querySelectorAll('.relative[data-time]').forEach(el => {
+      const iso = el.dataset.time;
+      if (iso) el.textContent = timeAgo(iso);
+    });
+  }, 60 * 1000);
+
+  // ---------- Toasts (replaces blocking alert() popups) ----------
+  function showToast(message, type = 'info', ms = 4500) {
+    const wrap = document.getElementById('toastWrap');
+    const el = document.createElement('div');
+    el.className = 'toast ' + type;
+    el.textContent = message;
+    wrap.appendChild(el);
+    setTimeout(() => {
+      el.style.transition = 'opacity 0.25s';
+      el.style.opacity = '0';
+      setTimeout(() => el.remove(), 250);
+    }, ms);
+  }
+
+  // ---------- Unread badges on the mode tabs ----------
+  function updateUnreadBadges() {
+    [['comments', 'badgeComments'], ['discord', 'badgeDiscord']].forEach(([mode, id]) => {
+      const badge = document.getElementById(id);
+      const n = unreadCounts[mode];
+      badge.textContent = n > 99 ? '99+' : n;
+      badge.classList.toggle('show', n > 0);
+    });
+  }
+  function bumpUnread(mode) {
+    if (currentMode === mode) return; // already looking at it
+    unreadCounts[mode]++;
+    updateUnreadBadges();
+  }
+  function clearUnread(mode) {
+    if (unreadCounts[mode]) { unreadCounts[mode] = 0; updateUnreadBadges(); }
+  }
+
+  // ---------- Preserve in-progress work across feed re-renders ----------
+  // The feed is rebuilt wholesale (innerHTML) whenever anything changes.
+  // Without this, a new incoming comment would wipe out a reply someone is
+  // halfway through typing, close their open reply box, and jump their
+  // scroll position. Capture that state before the rebuild, restore after.
+  function withPreservedFeedState(renderFn) {
+    const feed = document.getElementById('feed');
+    const drafts = {};
+    feed.querySelectorAll('.reply-box.open').forEach(box => {
+      const id = box.id.replace('reply-box-', '');
+      const ta = document.getElementById('reply-text-' + id);
+      const st = document.getElementById('reply-status-' + id);
+      drafts[id] = { value: ta ? ta.value : '', status: st ? st.textContent : '' };
+    });
+
+    const activeEl = document.activeElement;
+    const activeElId = activeEl && activeEl.id ? activeEl.id : null;
+    let caretStart = null, caretEnd = null;
+    if (activeEl && typeof activeEl.selectionStart === 'number') {
+      caretStart = activeEl.selectionStart;
+      caretEnd = activeEl.selectionEnd;
+    }
+    const prevScrollY = window.scrollY;
+    const prevDocHeight = document.documentElement.scrollHeight;
+
+    renderFn();
+
+    Object.keys(drafts).forEach(id => {
+      const box = document.getElementById('reply-box-' + id);
+      if (!box) return;
+      box.classList.add('open');
+      const ta = document.getElementById('reply-text-' + id);
+      if (ta) ta.value = drafts[id].value;
+      const st = document.getElementById('reply-status-' + id);
+      if (st) st.textContent = drafts[id].status;
+    });
+
+    if (activeElId) {
+      const el = document.getElementById(activeElId);
+      if (el) {
+        el.focus({ preventScroll: true });
+        if (caretStart !== null && el.setSelectionRange) {
+          try { el.setSelectionRange(caretStart, caretEnd); } catch (e) { /* not a text field */ }
+        }
+      }
+    }
+
+    // New items are prepended (newest first), so the content the person was
+    // reading shifts down by however much taller the page just got. Offset
+    // the scroll by that delta to keep their place instead of jumping.
+    const delta = document.documentElement.scrollHeight - prevDocHeight;
+    window.scrollTo(0, prevScrollY > 0 ? prevScrollY + delta : prevScrollY);
+  }
 
   // ---------- Notifications + sound ----------
   const NOTIFY_KEY = 'fbfeed-notify';
@@ -1131,7 +1378,7 @@
     }
     getAudioCtx();
     if (typeof Notification === 'undefined') {
-      alert('เบราว์เซอร์นี้ไม่รองรับการแจ้งเตือน');
+      showToast('เบราว์เซอร์นี้ไม่รองรับการแจ้งเตือน', 'error');
       return;
     }
     // If the person already denied the browser's permission prompt before,
@@ -1139,7 +1386,7 @@
     // refuse to re-prompt once denied. Tell them exactly where to fix it
     // instead of showing a useless "please allow" alert that can't help.
     if (Notification.permission === 'denied') {
-      alert('การแจ้งเตือนถูกบล็อกไว้ในเบราว์เซอร์นี้ (กดปิดไปตอนที่เบราว์เซอร์เคยถามครั้งแรก)\n\nวิธีแก้: คลิกไอคอนกุญแจ/ตัวล็อก 🔒 ที่แถบที่อยู่เว็บ (ซ้ายมือของ URL) → หา "Notifications" หรือ "การแจ้งเตือน" → เปลี่ยนเป็น "Allow" → รีเฟรชหน้านี้ แล้วกดกระดิ่งใหม่อีกครั้ง');
+      showToast('การแจ้งเตือนถูกบล็อกไว้ในเบราว์เซอร์นี้ (กดปิดไปตอนที่เบราว์เซอร์เคยถามครั้งแรก)\n\nวิธีแก้: คลิกไอคอนกุญแจ/ตัวล็อก 🔒 ที่แถบที่อยู่เว็บ (ซ้ายมือของ URL) → หา "Notifications" หรือ "การแจ้งเตือน" → เปลี่ยนเป็น "Allow" → รีเฟรชหน้านี้ แล้วกดกระดิ่งใหม่อีกครั้ง', 'error', 12000);
       return;
     }
     const permission = await Notification.requestPermission();
@@ -1148,7 +1395,7 @@
       playBeep();
     } else {
       localStorage.setItem(NOTIFY_KEY, 'off');
-      alert('กรุณาอนุญาตการแจ้งเตือนในเบราว์เซอร์ เพื่อเปิดใช้งานฟีเจอร์นี้');
+      showToast('กรุณาอนุญาตการแจ้งเตือนในเบราว์เซอร์ เพื่อเปิดใช้งานฟีเจอร์นี้', 'error');
     }
     updateNotifyIcon();
   });
@@ -1328,6 +1575,8 @@
     document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     currentMode = btn.dataset.mode;
+    resetFeedPaging();
+    clearUnread(currentMode);
     renderMain();
   });
 
@@ -1339,6 +1588,7 @@
     btn.classList.add('active');
     currentPage = btn.dataset.page;
     currentPostId = null;
+    resetFeedPaging();
     renderSidebar();
     renderMain();
   });
@@ -1348,6 +1598,7 @@
     followedFilterActive = false;
     currentDiscordChannelId = null;
     currentDiscordGuild = null;
+    resetFeedPaging();
     if (currentMode === 'discord') renderDiscordChannelSidebar();
     else renderSidebar();
     renderMain();
@@ -1364,6 +1615,7 @@
   // ---------- Search ----------
   document.getElementById('searchInput').addEventListener('input', (e) => {
     searchQuery = e.target.value.trim().toLowerCase();
+    resetFeedPaging();
     renderSidebar();
     if (currentMode === 'posts') renderMain();
   });
@@ -1479,7 +1731,7 @@
         console.error('archive toggle failed', data.error);
         if (isArchived) archivedIds.add(commentId); else archivedIds.delete(commentId);
         if (currentMode === 'comments') renderFeed();
-        alert('ผิดพลาด: ' + (data.error.message || JSON.stringify(data.error)));
+        showToast('ผิดพลาด: ' + (data.error.message || JSON.stringify(data.error)), 'error');
       }
     } catch (err) {
       console.error('archive toggle failed', err);
@@ -1502,6 +1754,7 @@
   }
   document.getElementById('archiveFilterToggle').addEventListener('click', () => {
     showArchivedOnly = !showArchivedOnly;
+    resetFeedPaging();
     document.getElementById('archiveFilterToggle').classList.toggle('on', showArchivedOnly);
     document.getElementById('archiveFilterToggle').textContent = showArchivedOnly ? '🗄 กำลังดูคอมเมนต์ที่เก็บถาวร (คลิกเพื่อกลับ)' : '🗄 แสดงคอมเมนต์ที่เก็บถาวร';
     renderFeed();
@@ -1614,6 +1867,8 @@
 
   function selectPost(postId) {
     currentPostId = (currentPostId === postId) ? null : postId;
+    resetFeedPaging();
+    closeMobileSidebar();
     if (currentPostId) {
       const post = allComments.find(c => c.post_id === currentPostId);
       if (post) {
@@ -1621,6 +1876,7 @@
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.page === currentPage));
       }
       currentMode = 'comments';
+      clearUnread('comments');
       document.querySelectorAll('.mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === 'comments'));
     }
     renderSidebar();
@@ -1648,12 +1904,23 @@
     else renderFeed();
   }
 
-  function renderFeed() {
+  function renderFeed() { withPreservedFeedState(renderFeedInner); }
+
+  function renderFeedInner() {
     let filtered = allComments;
     if (currentPage !== 'all') filtered = filtered.filter(c => c.page_name === currentPage);
     if (currentPostId) filtered = filtered.filter(c => c.post_id === currentPostId);
     if (followedFilterActive) filtered = filtered.filter(c => followedIds.has(c.comment_id));
     filtered = filtered.filter(c => showArchivedOnly ? archivedIds.has(c.comment_id) : !archivedIds.has(c.comment_id));
+    // The search box now matches comment text and commenter names too, not
+    // just the post message — so a specific complaint can actually be found.
+    if (searchQuery) {
+      filtered = filtered.filter(c =>
+        (c.message || '').toLowerCase().includes(searchQuery) ||
+        (c.from_name || '').toLowerCase().includes(searchQuery) ||
+        (c.post_message || '').toLowerCase().includes(searchQuery)
+      );
+    }
 
     const bar = document.getElementById('activeFilterBar');
     if (currentPostId) {
@@ -1664,16 +1931,27 @@
     } else if (followedFilterActive) {
       document.getElementById('activeFilterText').innerHTML = '🔖 กำลังดูเฉพาะคอมเมนต์ที่ติดตามอยู่';
       bar.classList.add('show');
+    } else if (searchQuery) {
+      document.getElementById('activeFilterText').innerHTML =
+        '🔍 ผลการค้นหา "' + escapeHtml(searchQuery) + '" — พบ ' + filtered.length + ' คอมเมนต์';
+      bar.classList.add('show');
     } else {
       bar.classList.remove('show');
     }
 
     const feed = document.getElementById('feed');
     if (filtered.length === 0) {
-      feed.innerHTML = `<div class="empty">${EMPTY_ICON}${showArchivedOnly ? 'ยังไม่มีคอมเมนต์ที่เก็บถาวร' : 'ยังไม่มีคอมเมนต์'}</div>`;
+      feed.innerHTML = `<div class="empty">${EMPTY_ICON}${searchQuery ? 'ไม่พบคอมเมนต์ที่ตรงกับคำค้นหา' : (showArchivedOnly ? 'ยังไม่มีคอมเมนต์ที่เก็บถาวร' : 'ยังไม่มีคอมเมนต์')}</div>`;
       return;
     }
-    feed.innerHTML = filtered.map(c => {
+
+    // Only draw a page at a time. Rendering all ~1500 comments on every
+    // change (new message, follow, archive) made the page crawl.
+    const total = filtered.length;
+    const shown = Math.min(feedRenderLimit, total);
+    const visible = filtered.slice(0, shown);
+
+    feed.innerHTML = visible.map(c => {
       const followed = followedIds.has(c.comment_id);
       const archived = archivedIds.has(c.comment_id);
       return `
@@ -1708,14 +1986,16 @@
         </div>
         <div class="meta">
           <span class="time-block">
-            <span class="relative">${timeAgo(c.created_time)}</span>
+            <span class="relative" data-time="${escapeHtml(c.created_time || '')}">${timeAgo(c.created_time)}</span>
             <span class="absolute">${fullDate(c.created_time)}</span>
           </span>
           ${(c.comment_permalink || c.post_permalink) ? `<a href="${escapeHtml(c.comment_permalink || c.post_permalink)}" target="_blank" rel="noopener"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg>ดูบน Facebook</a>` : ''}
         </div>
       </div>
     `;
-    }).join('');
+    }).join('') + (shown < total
+      ? `<button class="load-more-btn" data-load="comments">โหลดเพิ่ม (เหลืออีก ${(total - shown).toLocaleString('th-TH')} คอมเมนต์)</button>`
+      : '');
   }
 
   document.getElementById('feed').addEventListener('change', (e) => {
@@ -1725,7 +2005,30 @@
     }
   });
 
+  // Ctrl+Enter (or Cmd+Enter on Mac) sends the reply you're typing.
+  document.getElementById('feed').addEventListener('keydown', (e) => {
+    const ta = e.target.closest('textarea');
+    if (!ta || !ta.id.startsWith('reply-text-')) return;
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      const commentId = ta.id.replace('reply-text-', '');
+      const sendBtn = document.querySelector(`.reply-send-btn[data-comment-id="${CSS.escape(commentId)}"]`);
+      if (sendBtn) sendReply(commentId, sendBtn.dataset.pageName);
+    }
+  });
+
   document.getElementById('feed').addEventListener('click', (e) => {
+    const loadMoreBtn = e.target.closest('.load-more-btn');
+    if (loadMoreBtn) {
+      if (loadMoreBtn.dataset.load === 'discord') {
+        discordRenderLimit += FEED_PAGE_SIZE;
+        renderDiscordFeed();
+      } else {
+        feedRenderLimit += FEED_PAGE_SIZE;
+        renderFeed();
+      }
+      return;
+    }
     const replyToggleBtn = e.target.closest('.reply-toggle-btn');
     if (replyToggleBtn) {
       toggleReplyBox(replyToggleBtn.dataset.commentId);
@@ -1766,6 +2069,8 @@
     if (quickLink) {
       document.querySelectorAll('.mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === quickLink.dataset.mode));
       currentMode = quickLink.dataset.mode;
+      resetFeedPaging();
+      clearUnread(currentMode);
       followedFilterActive = quickLink.dataset.followFilter === 'true';
       renderMain();
     }
@@ -1899,6 +2204,8 @@
   }
 
   function selectDiscordGuild(guild) {
+    resetFeedPaging();
+    closeMobileSidebar();
     if (currentDiscordGuild === guild && !currentDiscordChannelId) {
       currentDiscordGuild = null;
     } else {
@@ -1910,6 +2217,8 @@
   }
 
   function selectDiscordChannel(channelId) {
+    resetFeedPaging();
+    closeMobileSidebar();
     currentDiscordChannelId = (currentDiscordChannelId === channelId) ? null : channelId;
     renderDiscordChannelSidebar();
     renderDiscordFeed();
@@ -1938,7 +2247,7 @@
       console.error('discord archive toggle failed', err);
       if (isArchived) discordArchivedIds.add(messageId); else discordArchivedIds.delete(messageId);
       if (currentMode === 'discord') renderDiscordFeed();
-      alert('ผิดพลาด: ' + (err.message || JSON.stringify(err)));
+      showToast('ผิดพลาด: ' + (err.message || JSON.stringify(err)), 'error');
     }
   }
   function subscribeDiscordArchivesRealtime() {
@@ -1956,6 +2265,7 @@
   }
   document.getElementById('discordArchiveFilterToggle').addEventListener('click', () => {
     discordShowArchivedOnly = !discordShowArchivedOnly;
+    resetFeedPaging();
     document.getElementById('discordArchiveFilterToggle').classList.toggle('on', discordShowArchivedOnly);
     document.getElementById('discordArchiveFilterToggle').textContent = discordShowArchivedOnly ? '🗄 กำลังดูข้อความที่เก็บถาวร (คลิกเพื่อกลับ)' : '🗄 แสดงข้อความที่เก็บถาวร';
     renderDiscordFeed();
@@ -1964,10 +2274,13 @@
   // ---------- Discord search (by #channel or person's name) ----------
   document.getElementById('discordSearchInput').addEventListener('input', (e) => {
     discordSearchQuery = e.target.value.trim().toLowerCase().replace(/^#/, '');
+    resetFeedPaging();
     if (currentMode === 'discord') renderDiscordFeed();
   });
 
-  function renderDiscordFeed() {
+  function renderDiscordFeed() { withPreservedFeedState(renderDiscordFeedInner); }
+
+  function renderDiscordFeedInner() {
     const bar = document.getElementById('activeFilterBar');
     let filtered = allDiscordMessages;
 
@@ -1988,7 +2301,8 @@
     if (discordSearchQuery) {
       filtered = filtered.filter(m =>
         (m.channel_name || '').toLowerCase().includes(discordSearchQuery) ||
-        (m.author_name || '').toLowerCase().includes(discordSearchQuery)
+        (m.author_name || '').toLowerCase().includes(discordSearchQuery) ||
+        (m.content || '').toLowerCase().includes(discordSearchQuery)
       );
     }
 
@@ -1996,10 +2310,15 @@
 
     const feed = document.getElementById('feed');
     if (filtered.length === 0) {
-      feed.innerHTML = `<div class="empty">${EMPTY_ICON}${discordShowArchivedOnly ? 'ยังไม่มีข้อความที่เก็บถาวร' : 'ยังไม่มีข้อความ Discord'}</div>`;
+      feed.innerHTML = `<div class="empty">${EMPTY_ICON}${discordSearchQuery ? 'ไม่พบข้อความที่ตรงกับคำค้นหา' : (discordShowArchivedOnly ? 'ยังไม่มีข้อความที่เก็บถาวร' : 'ยังไม่มีข้อความ Discord')}</div>`;
       return;
     }
-    feed.innerHTML = filtered.map(m => {
+
+    const total = filtered.length;
+    const shown = Math.min(discordRenderLimit, total);
+    const visible = filtered.slice(0, shown);
+
+    feed.innerHTML = visible.map(m => {
       const archived = discordArchivedIds.has(m.message_id);
       return `
       <div class="comment ${archived ? 'archived' : ''}">
@@ -2019,13 +2338,15 @@
         <div class="message">${escapeHtml(m.content)}</div>
         <div class="meta">
           <span class="time-block">
-            <span class="relative">${timeAgo(m.created_time)}</span>
+            <span class="relative" data-time="${escapeHtml(m.created_time || '')}">${timeAgo(m.created_time)}</span>
             <span class="absolute">${fullDate(m.created_time)}</span>
           </span>
         </div>
       </div>
     `;
-    }).join('');
+    }).join('') + (shown < total
+      ? `<button class="load-more-btn" data-load="discord">โหลดเพิ่ม (เหลืออีก ${(total - shown).toLocaleString('th-TH')} ข้อความ)</button>`
+      : '');
   }
 
   async function loadDiscordMessages() {
@@ -2041,9 +2362,12 @@
     // missed (e.g. it died silently after the tab was idle a long time).
     if (!isFirstLoad && hasLoadedDiscordOnce) {
       const missed = allDiscordMessages.filter(m => !previousIds.has(m.message_id));
-      if (missed.length > 0 && isNotifyEnabled()) {
-        playDiscordBeep();
-        showDiscordNotification(missed[0]);
+      if (missed.length > 0) {
+        missed.forEach(() => bumpUnread('discord'));
+        if (isNotifyEnabled()) {
+          playDiscordBeep();
+          showDiscordNotification(missed[0]);
+        }
       }
     }
     hasLoadedDiscordOnce = true;
@@ -2056,6 +2380,7 @@
         allDiscordMessages.unshift(payload.new);
         if (allDiscordMessages.length > 1000) allDiscordMessages.pop();
         if (currentMode === 'discord') { renderDiscordChannelSidebar(); renderDiscordFeed(); }
+        bumpUnread('discord');
         if (isNotifyEnabled()) {
           playDiscordBeep();
           showDiscordNotification(payload.new);
@@ -2554,7 +2879,7 @@
         if (!confirm('ลบสิทธิ์ของ ' + btn.dataset.email + ' ใช่ไหม?')) return;
         btn.disabled = true;
         const result = await callManageEmails('remove', btn.dataset.email);
-        if (result.error) { alert('ผิดพลาด: ' + (result.error.message || JSON.stringify(result.error))); btn.disabled = false; return; }
+        if (result.error) { showToast('ผิดพลาด: ' + (result.error.message || JSON.stringify(result.error)), 'error'); btn.disabled = false; return; }
         loadAndRenderUserList();
       });
     });
@@ -2564,7 +2889,7 @@
         if (newName === null) return;
         // Pass the existing role too — 'add' is a full upsert, so omitting it would silently reset the role to member.
         const result = await callManageEmails('add', btn.dataset.email, newName, btn.dataset.role);
-        if (result.error) { alert('ผิดพลาด: ' + (result.error.message || JSON.stringify(result.error))); return; }
+        if (result.error) { showToast('ผิดพลาด: ' + (result.error.message || JSON.stringify(result.error)), 'error'); return; }
         loadAndRenderUserList();
       });
     });
@@ -2575,7 +2900,7 @@
         btn.disabled = true;
         // Pass the existing name too — otherwise the upsert would wipe it.
         const result = await callManageEmails('add', btn.dataset.email, btn.dataset.name, newRole);
-        if (result.error) { alert('ผิดพลาด: ' + (result.error.message || JSON.stringify(result.error))); btn.disabled = false; return; }
+        if (result.error) { showToast('ผิดพลาด: ' + (result.error.message || JSON.stringify(result.error)), 'error'); btn.disabled = false; return; }
         loadAndRenderUserList();
       });
     });
@@ -2586,9 +2911,9 @@
     const nameInput = document.getElementById('newUserNameInput');
     const roleInput = document.getElementById('newUserRoleInput');
     const email = input.value.trim().toLowerCase();
-    if (!email || !email.includes('@')) { alert('กรุณากรอกอีเมลให้ถูกต้อง'); return; }
+    if (!email || !email.includes('@')) { showToast('กรุณากรอกอีเมลให้ถูกต้อง', 'error'); return; }
     const result = await callManageEmails('add', email, nameInput.value.trim(), roleInput.value);
-    if (result.error) { alert('ผิดพลาด: ' + (result.error.message || JSON.stringify(result.error))); return; }
+    if (result.error) { showToast('ผิดพลาด: ' + (result.error.message || JSON.stringify(result.error)), 'error'); return; }
     input.value = '';
     nameInput.value = '';
     loadAndRenderUserList();
@@ -2623,9 +2948,12 @@
     // before this refresh, and notify for anything genuinely new.
     if (!isFirstLoad && hasLoadedCommentsOnce) {
       const missed = allComments.filter(c => !previousIds.has(c.comment_id));
-      if (missed.length > 0 && isNotifyEnabled()) {
-        playFacebookBeep();
-        showCommentNotification(missed[0]);
+      if (missed.length > 0) {
+        missed.forEach(() => bumpUnread('comments'));
+        if (isNotifyEnabled()) {
+          playFacebookBeep();
+          showCommentNotification(missed[0]);
+        }
       }
     }
     hasLoadedCommentsOnce = true;
@@ -2640,6 +2968,7 @@
         renderSidebar();
         renderMain();
         document.getElementById('statusText').textContent = 'คอมเมนต์ใหม่ ' + new Date().toLocaleTimeString('th-TH');
+        bumpUnread('comments');
         if (isNotifyEnabled()) {
           playFacebookBeep();
           showCommentNotification(payload.new);
