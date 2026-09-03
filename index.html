@@ -840,6 +840,8 @@
     color: var(--text);
     box-shadow: var(--shadow-hover);
     max-width: 340px;
+    white-space: pre-line;
+    line-height: 1.5;
     animation: toastIn 0.2s ease;
     pointer-events: auto;
   }
@@ -1400,11 +1402,15 @@
   }, 60 * 1000);
 
   // ---------- Toasts (replaces blocking alert() popups) ----------
-  function showToast(message, type = 'info', ms = 4500) {
+  function showToast(message, type = 'info', ms = 4500, onClick = null) {
     const wrap = document.getElementById('toastWrap');
     const el = document.createElement('div');
     el.className = 'toast ' + type;
     el.textContent = message;
+    if (onClick) {
+      el.style.cursor = 'pointer';
+      el.addEventListener('click', () => { onClick(); el.remove(); });
+    }
     wrap.appendChild(el);
     setTimeout(() => {
       el.style.transition = 'opacity 0.25s';
@@ -1575,27 +1581,43 @@
       btn.title = 'เปิด/ปิดการแจ้งเตือน';
     }
   }
+  // The OS-level notification can be swallowed silently by Windows Focus
+  // Assist, by Chrome's notifications being switched off in OS settings, or
+  // it can throw outright on some mobile browsers. So the in-page toast is
+  // what actually guarantees a visible message; the OS notification is a
+  // best-effort extra on top of it.
   function showCommentNotification(c) {
+    const title = 'คอมเมนต์ใหม่ — ' + (c.page_name || '');
+    const body = (c.message || '').substring(0, 100);
+    const url = c.comment_permalink || c.post_permalink;
+
+    showToast(title + '\n' + body, 'info', 8000, url ? () => window.open(url, '_blank') : null);
+
     if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
-    const n = new Notification('คอมเมนต์ใหม่ — ' + c.page_name, {
-      body: (c.message || '').substring(0, 100),
-    });
-    n.onclick = () => {
-      window.focus();
-      const url = c.comment_permalink || c.post_permalink;
-      if (url) window.open(url, '_blank');
-      n.close();
-    };
+    try {
+      const n = new Notification(title, { body, tag: 'fb-' + c.comment_id, renotify: true });
+      n.onclick = () => {
+        window.focus();
+        if (url) window.open(url, '_blank');
+        n.close();
+      };
+    } catch (err) {
+      console.error('OS notification failed (toast shown instead)', err);
+    }
   }
   function showDiscordNotification(m) {
+    const title = 'Discord ใหม่ — #' + (m.channel_name || 'unknown');
+    const body = (m.author_name ? m.author_name + ': ' : '') + (m.content || '').substring(0, 100);
+
+    showToast(title + '\n' + body, 'info', 8000);
+
     if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
-    const n = new Notification('Discord ใหม่ — #' + (m.channel_name || 'unknown'), {
-      body: (m.author_name ? m.author_name + ': ' : '') + (m.content || '').substring(0, 100),
-    });
-    n.onclick = () => {
-      window.focus();
-      n.close();
-    };
+    try {
+      const n = new Notification(title, { body, tag: 'dc-' + m.message_id, renotify: true });
+      n.onclick = () => { window.focus(); n.close(); };
+    } catch (err) {
+      console.error('OS notification failed (toast shown instead)', err);
+    }
   }
   document.getElementById('notifyToggle').addEventListener('click', async () => {
     if (isNotifyEnabled()) {
