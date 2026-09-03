@@ -888,6 +888,66 @@
   }
   .load-more-btn:hover { background: var(--panel-hover); color: var(--text); border-color: var(--muted); }
 
+  /* ---------- Bulk selection ---------- */
+  .select-toggle-btn {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    cursor: pointer;
+    border: 1px solid var(--border);
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: var(--panel);
+    margin-bottom: 12px;
+    margin-left: 8px;
+    display: none;
+  }
+  .select-toggle-btn.on { background: rgba(56,189,248,0.15); border-color: var(--zone4); color: var(--zone4); }
+  .comment-check {
+    width: 17px;
+    height: 17px;
+    accent-color: var(--zone4);
+    cursor: pointer;
+    flex-shrink: 0;
+    margin-right: 2px;
+  }
+  .comment.selected { border-color: var(--zone4); background: rgba(56,189,248,0.06); }
+  .bulk-bar {
+    position: sticky;
+    top: 122px;
+    z-index: 9;
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    background: var(--panel);
+    border: 1px solid var(--zone4);
+    border-radius: 10px;
+    padding: 11px 15px;
+    margin-bottom: 14px;
+    box-shadow: var(--shadow-hover);
+  }
+  .bulk-bar.show { display: flex; }
+  .bulk-count { font-family: 'Prompt', sans-serif; font-weight: 600; font-size: 13px; }
+  .bulk-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .bulk-btn {
+    font-family: 'Prompt', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 6px 13px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--panel-hover);
+    color: var(--text);
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+  }
+  .bulk-btn:hover { background: var(--bg); border-color: var(--muted); }
+  .bulk-btn.primary { background: #ef4444; border-color: #ef4444; color: white; }
+  .bulk-btn.primary:hover { opacity: 0.9; background: #ef4444; }
+  .bulk-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
   /* ---------- Mobile sidebar drawer ---------- */
   .mobile-menu-btn {
     display: none;
@@ -1038,6 +1098,15 @@
     </div>
     <button class="archive-filter-toggle" id="archiveFilterToggle">🗄 แสดงคอมเมนต์ที่เก็บถาวร</button>
     <button class="archive-filter-toggle" id="discordArchiveFilterToggle" style="display:none;">🗄 แสดงข้อความที่เก็บถาวร</button>
+    <button class="select-toggle-btn" id="selectModeToggle">☑ เลือกหลายรายการ</button>
+    <div class="bulk-bar" id="bulkBar">
+      <span class="bulk-count" id="bulkCount">เลือกแล้ว 0 รายการ</span>
+      <div class="bulk-actions">
+        <button class="bulk-btn" id="bulkSelectAllBtn">เลือกทั้งหมดที่แสดง</button>
+        <button class="bulk-btn" id="bulkClearBtn">ล้างการเลือก</button>
+        <button class="bulk-btn primary" id="bulkArchiveBtn" disabled>เก็บถาวร</button>
+      </div>
+    </div>
     <div id="feed"><div class="empty">กำลังโหลดคอมเมนต์...</div></div>
   </main>
 </div>
@@ -1130,6 +1199,9 @@
   let feedRenderLimit = FEED_PAGE_SIZE;        // how many FB comments are currently drawn
   let discordRenderLimit = FEED_PAGE_SIZE;     // how many Discord messages are currently drawn
   let unreadCounts = { comments: 0, discord: 0 };
+  let selectionMode = false;
+  let selectedIds = new Set();          // FB comment_ids ticked for bulk action
+  let selectedDiscordIds = new Set();   // Discord message_ids ticked for bulk action
   let appInitialized = false;
   let hasLoadedCommentsOnce = false;
   let hasLoadedDiscordOnce = false;
@@ -1146,6 +1218,161 @@
   document.getElementById('themeToggle').addEventListener('click', () => {
     applyTheme(document.documentElement.classList.contains('light') ? 'dark' : 'light');
   });
+
+  // ---------- Bulk selection & archiving ----------
+  function currentSelection() {
+    return currentMode === 'discord' ? selectedDiscordIds : selectedIds;
+  }
+  // Whether the current view is showing already-archived items — determines
+  // whether the bulk button archives or restores.
+  function bulkIsRestoreMode() {
+    return currentMode === 'discord' ? discordShowArchivedOnly : showArchivedOnly;
+  }
+  function updateBulkBar() {
+    const bar = document.getElementById('bulkBar');
+    const toggle = document.getElementById('selectModeToggle');
+    const canSelect = currentMode === 'comments' || currentMode === 'discord';
+    toggle.style.display = canSelect ? 'inline-block' : 'none';
+    toggle.classList.toggle('on', selectionMode);
+    toggle.textContent = selectionMode ? '☑ ออกจากโหมดเลือก' : '☑ เลือกหลายรายการ';
+
+    if (!selectionMode || !canSelect) { bar.classList.remove('show'); return; }
+    bar.classList.add('show');
+    const n = currentSelection().size;
+    const restore = bulkIsRestoreMode();
+    document.getElementById('bulkCount').textContent = 'เลือกแล้ว ' + n.toLocaleString('th-TH') + ' รายการ';
+    const btn = document.getElementById('bulkArchiveBtn');
+    btn.textContent = restore ? `กู้คืน ${n ? n.toLocaleString('th-TH') + ' รายการ' : ''}`.trim()
+                              : `เก็บถาวร ${n ? n.toLocaleString('th-TH') + ' รายการ' : ''}`.trim();
+    btn.disabled = n === 0;
+  }
+  function clearSelection() {
+    selectedIds.clear();
+    selectedDiscordIds.clear();
+  }
+  document.getElementById('selectModeToggle').addEventListener('click', () => {
+    selectionMode = !selectionMode;
+    if (!selectionMode) clearSelection();
+    updateBulkBar();
+    if (currentMode === 'discord') renderDiscordFeed(); else renderFeed();
+  });
+  document.getElementById('bulkClearBtn').addEventListener('click', () => {
+    clearSelection();
+    updateBulkBar();
+    if (currentMode === 'discord') renderDiscordFeed(); else renderFeed();
+  });
+  document.getElementById('bulkSelectAllBtn').addEventListener('click', () => {
+    // "All shown" means everything currently drawn in the feed, so what gets
+    // selected always matches what the person can actually see.
+    const sel = currentSelection();
+    document.querySelectorAll('#feed .comment-check').forEach(cb => {
+      sel.add(cb.dataset.selectId || cb.dataset.selectDiscordId);
+    });
+    updateBulkBar();
+    if (currentMode === 'discord') renderDiscordFeed(); else renderFeed();
+  });
+
+  // Checkbox ticks are handled here rather than re-rendering the whole feed
+  // on every click — that would be slow and would fight the checkbox itself.
+  document.getElementById('feed').addEventListener('change', (e) => {
+    const cb = e.target.closest('.comment-check');
+    if (!cb) return;
+    const id = cb.dataset.selectId || cb.dataset.selectDiscordId;
+    const sel = cb.dataset.selectDiscordId ? selectedDiscordIds : selectedIds;
+    if (cb.checked) sel.add(id); else sel.delete(id);
+    const card = cb.closest('.comment');
+    if (card) card.classList.toggle('selected', cb.checked);
+    updateBulkBar();
+  });
+
+  document.getElementById('bulkArchiveBtn').addEventListener('click', async () => {
+    if (!currentSession) { openLoginModal(); return; }
+    const restore = bulkIsRestoreMode();
+    const btn = document.getElementById('bulkArchiveBtn');
+    const isDiscord = currentMode === 'discord';
+    const ids = Array.from(isDiscord ? selectedDiscordIds : selectedIds);
+    if (ids.length === 0) return;
+    if (!confirm((restore ? 'กู้คืน ' : 'เก็บถาวร ') + ids.length + ' รายการที่เลือกไว้ ใช่ไหม?')) return;
+
+    btn.disabled = true;
+    btn.textContent = 'กำลังดำเนินการ...';
+    try {
+      if (isDiscord) {
+        await bulkArchiveDiscord(ids, restore);
+      } else {
+        await bulkArchiveComments(ids, restore);
+      }
+    } finally {
+      clearSelection();
+      updateBulkBar();
+      if (isDiscord) renderDiscordFeed(); else renderFeed();
+    }
+  });
+
+  // Discord archives live in a plain table, so the whole batch goes in one
+  // round trip rather than one request per message.
+  async function bulkArchiveDiscord(ids, restore) {
+    try {
+      if (restore) {
+        const { error } = await supabaseClient.from('discord_message_archives').delete().in('message_id', ids);
+        if (error) throw error;
+        ids.forEach(id => discordArchivedIds.delete(id));
+      } else {
+        const rows = ids.map(id => ({ message_id: id }));
+        const { error } = await supabaseClient.from('discord_message_archives').upsert(rows, { onConflict: 'message_id' });
+        if (error) throw error;
+        ids.forEach(id => discordArchivedIds.add(id));
+      }
+      showToast((restore ? 'กู้คืน ' : 'เก็บถาวร ') + ids.length + ' ข้อความเรียบร้อย', 'success');
+    } catch (err) {
+      console.error('bulk discord archive failed', err);
+      showToast('ผิดพลาด: ' + (err.message || JSON.stringify(err)), 'error');
+    }
+  }
+
+  // Facebook comments have to go through the toggle-archive Edge Function
+  // (it verifies the session and writes the audit log), which takes one
+  // comment at a time — so send them in small concurrent batches instead of
+  // firing hundreds of requests at once.
+  async function bulkArchiveComments(ids, restore) {
+    const byId = {};
+    allComments.forEach(c => { byId[c.comment_id] = c; });
+    let ok = 0, failed = 0;
+    const CONCURRENCY = 5;
+
+    for (let i = 0; i < ids.length; i += CONCURRENCY) {
+      const chunk = ids.slice(i, i + CONCURRENCY);
+      await Promise.all(chunk.map(async (id) => {
+        try {
+          const resp = await fetch(TOGGLE_ARCHIVE_FUNCTION_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY },
+            body: JSON.stringify({
+              comment_id: id,
+              page_name: (byId[id] && byId[id].page_name) || '',
+              do_archive: !restore,
+              access_token: currentSession.access_token,
+            }),
+          });
+          const data = await resp.json();
+          if (data.error) { failed++; return; }
+          if (restore) archivedIds.delete(id); else archivedIds.add(id);
+          ok++;
+        } catch (err) {
+          console.error('bulk archive item failed', id, err);
+          failed++;
+        }
+      }));
+      document.getElementById('bulkArchiveBtn').textContent =
+        `กำลังดำเนินการ... ${Math.min(i + CONCURRENCY, ids.length)}/${ids.length}`;
+    }
+
+    if (failed === 0) {
+      showToast((restore ? 'กู้คืน ' : 'เก็บถาวร ') + ok + ' คอมเมนต์เรียบร้อย', 'success');
+    } else {
+      showToast(`สำเร็จ ${ok} รายการ, ไม่สำเร็จ ${failed} รายการ`, 'error', 7000);
+    }
+  }
 
   function resetFeedPaging() {
     feedRenderLimit = FEED_PAGE_SIZE;
@@ -1888,6 +2115,7 @@
     document.getElementById('archiveFilterToggle').style.display = currentMode === 'comments' ? 'inline-block' : 'none';
     document.getElementById('discordArchiveFilterToggle').style.display = currentMode === 'discord' ? 'inline-block' : 'none';
     document.getElementById('discordSearchBoxWrap').style.display = currentMode === 'discord' ? 'flex' : 'none';
+    updateBulkBar();
     document.querySelector('.layout').classList.toggle('no-sidebar', currentMode === 'dashboard' || currentMode === 'audit' || currentMode === 'users');
     document.getElementById('archivePageToggle').style.display = currentMode === 'posts' ? 'flex' : 'none';
     document.getElementById('pageTabs').style.display = currentMode === 'discord' ? 'none' : 'flex';
@@ -1955,9 +2183,10 @@
       const followed = followedIds.has(c.comment_id);
       const archived = archivedIds.has(c.comment_id);
       return `
-      <div class="comment ${followed ? 'followed' : ''} ${archived ? 'archived' : ''}">
+      <div class="comment ${followed ? 'followed' : ''} ${archived ? 'archived' : ''} ${selectionMode && selectedIds.has(c.comment_id) ? 'selected' : ''}">
         <div class="comment-top">
           <div class="who">
+            ${selectionMode ? `<input type="checkbox" class="comment-check" data-select-id="${escapeHtml(c.comment_id)}" ${selectedIds.has(c.comment_id) ? 'checked' : ''}>` : ''}
             ${renderAvatar(c.from_name)}
             <span class="from ${isAnonymous(c.from_name) ? 'anonymous' : ''}">${escapeHtml(displayName(c.from_name))}</span>
           </div>
@@ -2321,9 +2550,10 @@
     feed.innerHTML = visible.map(m => {
       const archived = discordArchivedIds.has(m.message_id);
       return `
-      <div class="comment ${archived ? 'archived' : ''}">
+      <div class="comment ${archived ? 'archived' : ''} ${selectionMode && selectedDiscordIds.has(m.message_id) ? 'selected' : ''}">
         <div class="comment-top">
           <div class="who">
+            ${selectionMode ? `<input type="checkbox" class="comment-check" data-select-discord-id="${escapeHtml(m.message_id)}" ${selectedDiscordIds.has(m.message_id) ? 'checked' : ''}>` : ''}
             ${renderAvatar(m.author_name)}
             <span class="from">${escapeHtml(m.author_name || 'ไม่ทราบชื่อ')}</span>
           </div>
