@@ -1515,49 +1515,38 @@
       osc.stop(ctx.currentTime + 0.35);
     } catch (e) { console.error('beep failed', e); }
   }
-  // Three-note rising "pop" (bright major-arpeggio feel) — the kind of chime chat apps like FB Messenger use.
-  function playFacebookBeep() {
+  // Both chimes share one envelope so they're equally loud and equally long
+  // (~1.2s). Only the direction of the arpeggio differs: Facebook rises to a
+  // held high note, Discord falls to a held low one — distinguishable by ear
+  // without either feeling weaker than the other.
+  function playChime(freqs, finalFreq) {
     try {
       const ctx = getAudioCtx();
       if (ctx.state === 'suspended') ctx.resume();
       const now = ctx.currentTime;
-      [523, 659, 880].forEach((freq, i) => {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.value = freq;
-        const t = now + i * 0.085;
-        gain.gain.setValueAtTime(0.001, t);
-        gain.gain.linearRampToValueAtTime(0.38, t + 0.02);
-        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.26);
-        osc.connect(gain).connect(ctx.destination);
-        osc.start(t);
-        osc.stop(t + 0.28);
-      });
-    } catch (e) { console.error('fb beep failed', e); }
-  }
-  // Three-note descending "ding" with a deeper closing note (rounder, gong-like feel) — the kind of chime Discord uses.
-  function playDiscordBeep() {
-    try {
-      const ctx = getAudioCtx();
-      if (ctx.state === 'suspended') ctx.resume();
-      const now = ctx.currentTime;
-      [988, 740, 494].forEach((freq, i) => {
+      const play = (freq, t, dur, peak) => {
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         osc.type = 'triangle';
         osc.frequency.value = freq;
-        const t = now + i * 0.1;
-        const peak = i === 2 ? 0.34 : 0.4;
-        const tail = i === 2 ? 0.42 : 0.26;
         gain.gain.setValueAtTime(0.001, t);
-        gain.gain.linearRampToValueAtTime(peak, t + 0.015);
-        gain.gain.exponentialRampToValueAtTime(0.001, t + tail);
+        gain.gain.linearRampToValueAtTime(peak, t + 0.012);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + dur);
         osc.connect(gain).connect(ctx.destination);
         osc.start(t);
-        osc.stop(t + tail + 0.02);
-      });
-    } catch (e) { console.error('discord beep failed', e); }
+        osc.stop(t + dur + 0.02);
+      };
+      freqs.forEach((freq, i) => play(freq, now + i * 0.08, 0.26, 0.36));
+      play(finalFreq, now + 0.32, 0.85, 0.38);
+    } catch (e) { console.error('chime failed', e); }
+  }
+  // Rising arpeggio resolving on a held high note — the "level up" fanfare.
+  function playFacebookBeep() {
+    playChime([523, 659, 784, 1047], 1319);
+  }
+  // The same fanfare mirrored downward, resolving on a held low note.
+  function playDiscordBeep() {
+    playChime([1319, 1047, 784, 659], 523);
   }
   function isNotifyEnabled() {
     const wantsOn = localStorage.getItem(NOTIFY_KEY) === 'on';
