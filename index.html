@@ -1091,7 +1091,13 @@
     return wantsOn && hasPermission;
   }
   function updateNotifyIcon() {
-    document.getElementById('notifyToggle').classList.toggle('active', isNotifyEnabled());
+    const btn = document.getElementById('notifyToggle');
+    btn.classList.toggle('active', isNotifyEnabled());
+    if (typeof Notification !== 'undefined' && Notification.permission === 'denied') {
+      btn.title = '🔒 การแจ้งเตือนถูกบล็อกไว้ในเบราว์เซอร์ — ต้องไปเปิดเองจากตั้งค่าไซต์ (คลิกไอคอนกุญแจข้าง URL)';
+    } else {
+      btn.title = 'เปิด/ปิดการแจ้งเตือน';
+    }
   }
   function showCommentNotification(c) {
     if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
@@ -1124,6 +1130,14 @@
     getAudioCtx();
     if (typeof Notification === 'undefined') {
       alert('เบราว์เซอร์นี้ไม่รองรับการแจ้งเตือน');
+      return;
+    }
+    // If the person already denied the browser's permission prompt before,
+    // calling requestPermission() again won't show anything — browsers
+    // refuse to re-prompt once denied. Tell them exactly where to fix it
+    // instead of showing a useless "please allow" alert that can't help.
+    if (Notification.permission === 'denied') {
+      alert('การแจ้งเตือนถูกบล็อกไว้ในเบราว์เซอร์นี้ (กดปิดไปตอนที่เบราว์เซอร์เคยถามครั้งแรก)\n\nวิธีแก้: คลิกไอคอนกุญแจ/ตัวล็อก 🔒 ที่แถบที่อยู่เว็บ (ซ้ายมือของ URL) → หา "Notifications" หรือ "การแจ้งเตือน" → เปลี่ยนเป็น "Allow" → รีเฟรชหน้านี้ แล้วกดกระดิ่งใหม่อีกครั้ง');
       return;
     }
     const permission = await Notification.requestPermission();
