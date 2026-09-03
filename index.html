@@ -1386,6 +1386,26 @@
     }
   }
 
+  // The Facebook Edge Function re-upserts every post and comment it fetches
+  // on each cron run, and Postgres emits an UPDATE for each row even when the
+  // values are identical — hundreds of events in a burst. Repainting per
+  // event made the page strobe, so renders are coalesced into one frame.
+  let pendingRender = null;
+  function scheduleRender(opts = {}) {
+    if (!pendingRender) pendingRender = { sidebar: false, main: false };
+    if (opts.sidebar) pendingRender.sidebar = true;
+    if (opts.main) pendingRender.main = true;
+    if (pendingRender.timer) return;
+    pendingRender.timer = setTimeout(() => {
+      const job = pendingRender;
+      pendingRender = null;
+      if (job.sidebar) {
+        if (currentMode === 'discord') renderDiscordChannelSidebar(); else renderSidebar();
+      }
+      if (job.main) renderMain();
+    }, 150);
+  }
+
   function resetFeedPaging() {
     feedRenderLimit = FEED_PAGE_SIZE;
     discordRenderLimit = FEED_PAGE_SIZE;
@@ -2649,7 +2669,7 @@
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'discord_messages' }, (payload) => {
         allDiscordMessages.unshift(payload.new);
         if (allDiscordMessages.length > 1000) allDiscordMessages.pop();
-        if (currentMode === 'discord') { renderDiscordChannelSidebar(); renderDiscordFeed(); }
+        scheduleRender({ sidebar: true, main: true });
         bumpUnread('discord');
         if (isNotifyEnabled()) {
           playDiscordBeep();
@@ -2660,9 +2680,15 @@
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'discord_messages' }, (payload) => {
         const idx = allDiscordMessages.findIndex(m => m.message_id === payload.new.message_id);
         if (idx === -1) return;
-        const textChanged = allDiscordMessages[idx].content !== payload.new.content;
+        const prev = allDiscordMessages[idx];
+        const textChanged = prev.content !== payload.new.content;
+        const displayChanged = textChanged
+          || prev.author_name !== payload.new.author_name
+          || prev.channel_name !== payload.new.channel_name
+          || prev.edited_at !== payload.new.edited_at;
         allDiscordMessages[idx] = payload.new;
-        if (currentMode === 'discord') { renderDiscordChannelSidebar(); renderDiscordFeed(); }
+        if (!displayChanged) return;
+        scheduleRender({ sidebar: true, main: true });
         if (!textChanged) return;
         bumpUnread('discord');
         if (isNotifyEnabled()) {
@@ -3250,8 +3276,7 @@
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'comments' }, (payload) => {
         allComments.unshift(payload.new);
         if (allComments.length > 1500) allComments.pop();
-        renderSidebar();
-        renderMain();
+        scheduleRender({ sidebar: true, main: true });
         document.getElementById('statusText').textContent = 'คอมเมนต์ใหม่ ' + new Date().toLocaleTimeString('th-TH');
         bumpUnread('comments');
         if (isNotifyEnabled()) {
@@ -3264,10 +3289,18 @@
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'comments' }, (payload) => {
         const idx = allComments.findIndex(c => c.comment_id === payload.new.comment_id);
         if (idx === -1) return;
-        const textChanged = allComments[idx].message !== payload.new.message;
+        const prev = allComments[idx];
+        const textChanged = prev.message !== payload.new.message;
+        // Most of these UPDATEs are the ingest job rewriting identical rows.
+        // Only repaint when something actually visible on screen differs.
+        const displayChanged = textChanged
+          || prev.from_name !== payload.new.from_name
+          || prev.attachment_url !== payload.new.attachment_url
+          || prev.comment_permalink !== payload.new.comment_permalink
+          || prev.edited_at !== payload.new.edited_at;
         allComments[idx] = payload.new;
-        renderSidebar();
-        renderMain();
+        if (!displayChanged) return;
+        scheduleRender({ sidebar: true, main: true });
         if (!textChanged) return;   // permalink backfills etc. shouldn't alert anyone
         document.getElementById('statusText').textContent = 'คอมเมนต์ถูกแก้ไข ' + new Date().toLocaleTimeString('th-TH');
         bumpUnread('comments');
@@ -3281,16 +3314,19 @@
         if (!allPosts.some(p => p.post_id === payload.new.post_id)) {
           allPosts.unshift(payload.new);
           if (allPosts.length > 800) allPosts.pop();
-          renderSidebar();
-          if (currentMode === 'posts' || currentMode === 'dashboard') renderMain();
+          scheduleRender({ sidebar: true, main: currentMode === 'posts' || currentMode === 'dashboard' });
         }
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'posts' }, (payload) => {
         const idx = allPosts.findIndex(p => p.post_id === payload.new.post_id);
         if (idx === -1) return;
+        const prev = allPosts[idx];
+        const displayChanged = prev.post_message !== payload.new.post_message
+          || prev.post_image_url !== payload.new.post_image_url
+          || prev.post_permalink !== payload.new.post_permalink;
         allPosts[idx] = payload.new;
-        renderSidebar();
-        if (currentMode === 'posts' || currentMode === 'dashboard') renderMain();
+        if (!displayChanged) return;
+        scheduleRender({ sidebar: true, main: currentMode === 'posts' || currentMode === 'dashboard' });
       })
       .subscribe();
   }
@@ -3324,7 +3360,7 @@
   let lastResyncAt = 0;
   function resyncNow() {
     const now = Date.now();
-    if (now - lastResyncAt < 3000) return; // avoid duplicate bursts (visibilitychange + online can both fire)
+    if (now - lastResyncAt < 30000) return; // one full reload per 30s at most
     lastResyncAt = now;
     // Re-check notification permission (it may have been revoked while the
     // tab was idle) and try to wake the audio engine — returning to the tab
@@ -3363,7 +3399,9 @@
     if (document.visibilityState === 'visible' && appInitialized) resyncNow();
   });
   window.addEventListener('online', () => { if (appInitialized) resyncNow(); });
-  window.addEventListener('focus', () => { if (appInitialized) resyncNow(); });
+  // No 'focus' listener: it fires on every click back into the window, and
+  // each resync reloads and repaints everything. visibilitychange already
+  // covers the case that matters (returning to a backgrounded tab).
 
   // The whole site is gated: nothing loads until a session is confirmed.
   initAuth();
