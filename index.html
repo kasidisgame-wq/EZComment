@@ -1467,11 +1467,76 @@
     if (unreadCounts[mode]) { unreadCounts[mode] = 0; updateUnreadBadges(); }
   }
 
-  // ---------- Preserve in-progress work across feed re-renders ----------
-  // The feed is rebuilt wholesale (innerHTML) whenever anything changes.
-  // Without this, a new incoming comment would wipe out a reply someone is
-  // halfway through typing, close their open reply box, and jump their
-  // scroll position. Capture that state before the rebuild, restore after.
+  // ---------- Incremental feed rendering ----------
+  // The feed used to be rebuilt wholesale with `innerHTML = ...` on every
+  // update. That destroyed and recreated every card — including every <img> —
+  // so the browser re-laid-out and re-decoded the whole list each time, which
+  // is what showed up as flickering. Now each card carries a key and a
+  // signature of the data it was drawn from, and only cards whose signature
+  // actually changed get replaced. Untouched cards keep their DOM nodes, so
+  // images never reload, scroll position holds by itself, and an open reply
+  // box with a half-typed draft in it simply survives.
+  // The sidebar is small enough to rebuild as one string, but writing it
+  // when nothing changed still resets its scroll position and repaints it.
+  // Compare against what's already there and skip the write if identical.
+  function setHtmlIfChanged(el, html) {
+    if (el.dataset.lastHtml === html) return;
+    el.dataset.lastHtml = html;
+    el.innerHTML = html;
+  }
+
+  function makeFeedEl(html, key, sig) {
+    const tpl = document.createElement('template');
+    tpl.innerHTML = html.trim();
+    const el = tpl.content.firstElementChild;
+    el.dataset.key = key;
+    el.dataset.sig = sig;
+    return el;
+  }
+
+  function reconcileFeed(container, items, keyOf, sigOf, htmlOf, trailingHtml) {
+    const existing = new Map();
+    Array.from(container.children).forEach(el => {
+      if (el.dataset && el.dataset.key) existing.set(el.dataset.key, el);
+      else el.remove(); // stale empty-state or load-more button
+    });
+
+    let prev = null;
+    items.forEach(item => {
+      const key = String(keyOf(item));
+      const sig = String(sigOf(item));
+      let el = existing.get(key);
+      if (el) {
+        existing.delete(key);
+        if (el.dataset.sig !== sig) {
+          const fresh = makeFeedEl(htmlOf(item), key, sig);
+          el.replaceWith(fresh);
+          el = fresh;
+        }
+      } else {
+        el = makeFeedEl(htmlOf(item), key, sig);
+      }
+      const target = prev ? prev.nextElementSibling : container.firstElementChild;
+      if (el !== target) container.insertBefore(el, target);
+      prev = el;
+    });
+
+    existing.forEach(el => el.remove());
+
+    // Anything after the last card (the "load more" button) is rebuilt, but
+    // it's a single element so there's nothing to flicker.
+    let tail = prev ? prev.nextElementSibling : container.firstElementChild;
+    while (tail) {
+      const next = tail.nextElementSibling;
+      tail.remove();
+      tail = next;
+    }
+    if (trailingHtml) container.insertAdjacentHTML('beforeend', trailingHtml);
+  }
+
+  // Safety net for the case where the card someone is typing into *does* get
+  // replaced (its text was edited under them). Cards that don't change are
+  // never touched, so this usually has nothing to do.
   function withPreservedFeedState(renderFn) {
     const feed = document.getElementById('feed');
     const drafts = {};
@@ -1489,8 +1554,6 @@
       caretStart = activeEl.selectionStart;
       caretEnd = activeEl.selectionEnd;
     }
-    const prevScrollY = window.scrollY;
-    const prevDocHeight = document.documentElement.scrollHeight;
 
     renderFn();
 
@@ -1499,12 +1562,12 @@
       if (!box) return;
       box.classList.add('open');
       const ta = document.getElementById('reply-text-' + id);
-      if (ta) ta.value = drafts[id].value;
+      if (ta && ta.value !== drafts[id].value) ta.value = drafts[id].value;
       const st = document.getElementById('reply-status-' + id);
       if (st) st.textContent = drafts[id].status;
     });
 
-    if (activeElId) {
+    if (activeElId && document.activeElement !== document.getElementById(activeElId)) {
       const el = document.getElementById(activeElId);
       if (el) {
         el.focus({ preventScroll: true });
@@ -1513,12 +1576,8 @@
         }
       }
     }
-
-    // New items are prepended (newest first), so the content the person was
-    // reading shifts down by however much taller the page just got. Offset
-    // the scroll by that delta to keep their place instead of jumping.
-    const delta = document.documentElement.scrollHeight - prevDocHeight;
-    window.scrollTo(0, prevScrollY > 0 ? prevScrollY + delta : prevScrollY);
+    // No scroll adjustment: because unchanged cards keep their DOM nodes, the
+    // browser's own scroll anchoring already holds the reading position.
   }
 
   // ---------- Notifications + sound ----------
@@ -2075,7 +2134,7 @@
     const posts = getPostsForCurrentPage();
     const list = document.getElementById('postList');
     if (posts.length === 0) {
-      list.innerHTML = `<div class="empty" style="padding:20px 8px;">${EMPTY_ICON}ไม่พบโพสต์</div>`;
+      setHtmlIfChanged(list, `<div class="empty" style="padding:20px 8px;">${EMPTY_ICON}ไม่พบโพสต์</div>`);
       return;
     }
     const groups = {};
@@ -2083,7 +2142,7 @@
     const pageOrder = ['Zone4', 'TOSM 2026'];
     const pageNames = [...pageOrder.filter(n => groups[n]), ...Object.keys(groups).filter(n => !pageOrder.includes(n))];
 
-    list.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;align-items:start;">` + pageNames.map(pageName => {
+    const html = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;align-items:start;">` + pageNames.map(pageName => {
       const groupPosts = groups[pageName];
       const collapsed = collapsedFbPages.has(pageName);
       const color = fbPageColor(pageName);
@@ -2113,6 +2172,7 @@
         </div>
       `;
     }).join('') + `</div>`;
+    setHtmlIfChanged(list, html);
   }
 
   document.getElementById('postList').addEventListener('click', (e) => {
@@ -2237,7 +2297,7 @@
     const shown = Math.min(feedRenderLimit, total);
     const visible = filtered.slice(0, shown);
 
-    feed.innerHTML = visible.map(c => {
+    const cardHtml = (c) => {
       const followed = followedIds.has(c.comment_id);
       const archived = archivedIds.has(c.comment_id);
       return `
@@ -2281,9 +2341,27 @@
         </div>
       </div>
     `;
-    }).join('') + (shown < total
-      ? `<button class="load-more-btn" data-load="comments">โหลดเพิ่ม (เหลืออีก ${(total - shown).toLocaleString('th-TH')} คอมเมนต์)</button>`
-      : '');
+    };
+
+    // The signature covers every field the card above actually renders, so a
+    // card is only rebuilt when one of them really differs.
+    const sigOf = (c) => [
+      c.message, c.from_name, c.attachment_url, c.comment_permalink, c.post_permalink,
+      c.created_time, c.edited_at, c.page_name,
+      followedIds.has(c.comment_id) ? 'f' : '', followCategories[c.comment_id] || '',
+      archivedIds.has(c.comment_id) ? 'a' : '',
+      selectionMode ? (selectedIds.has(c.comment_id) ? 's1' : 's0') : '',
+    ].join('|');
+
+    reconcileFeed(
+      feed, visible,
+      (c) => c.comment_id,
+      sigOf,
+      cardHtml,
+      shown < total
+        ? `<button class="load-more-btn" data-load="comments">โหลดเพิ่ม (เหลืออีก ${(total - shown).toLocaleString('th-TH')} คอมเมนต์)</button>`
+        : ''
+    );
   }
 
   document.getElementById('feed').addEventListener('change', (e) => {
@@ -2455,10 +2533,10 @@
     refreshDiscordGuildColorMap(serverNames);
     const list = document.getElementById('postList');
     if (serverNames.length === 0) {
-      list.innerHTML = `<div class="empty" style="padding:20px 8px;">${EMPTY_ICON}ยังไม่มีช่อง</div>`;
+      setHtmlIfChanged(list, `<div class="empty" style="padding:20px 8px;">${EMPTY_ICON}ยังไม่มีช่อง</div>`);
       return;
     }
-    list.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;align-items:start;">` + serverNames.map(guild => {
+    const html = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;align-items:start;">` + serverNames.map(guild => {
       const channels = Object.entries(servers[guild]).sort((a, b) => a[1].name.localeCompare(b[1].name));
       const totalCount = channels.reduce((sum, [, info]) => sum + info.count, 0);
       const guildActive = currentDiscordGuild === guild && !currentDiscordChannelId;
@@ -2489,6 +2567,7 @@
         </div>
       `;
     }).join('') + `</div>`;
+    setHtmlIfChanged(list, html);
   }
 
   function selectDiscordGuild(guild) {
@@ -2606,7 +2685,7 @@
     const shown = Math.min(discordRenderLimit, total);
     const visible = filtered.slice(0, shown);
 
-    feed.innerHTML = visible.map(m => {
+    const cardHtml = (m) => {
       const archived = discordArchivedIds.has(m.message_id);
       return `
       <div class="comment ${archived ? 'archived' : ''} ${selectionMode && selectedDiscordIds.has(m.message_id) ? 'selected' : ''}">
@@ -2634,9 +2713,23 @@
         </div>
       </div>
     `;
-    }).join('') + (shown < total
-      ? `<button class="load-more-btn" data-load="discord">โหลดเพิ่ม (เหลืออีก ${(total - shown).toLocaleString('th-TH')} ข้อความ)</button>`
-      : '');
+    };
+
+    const sigOf = (m) => [
+      m.content, m.author_name, m.channel_name, m.guild_name, m.created_time, m.edited_at,
+      discordArchivedIds.has(m.message_id) ? 'a' : '',
+      selectionMode ? (selectedDiscordIds.has(m.message_id) ? 's1' : 's0') : '',
+    ].join('|');
+
+    reconcileFeed(
+      feed, visible,
+      (m) => m.message_id,
+      sigOf,
+      cardHtml,
+      shown < total
+        ? `<button class="load-more-btn" data-load="discord">โหลดเพิ่ม (เหลืออีก ${(total - shown).toLocaleString('th-TH')} ข้อความ)</button>`
+        : ''
+    );
   }
 
   async function loadDiscordMessages() {
@@ -2669,7 +2762,7 @@
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'discord_messages' }, (payload) => {
         allDiscordMessages.unshift(payload.new);
         if (allDiscordMessages.length > 1000) allDiscordMessages.pop();
-        scheduleRender({ sidebar: true, main: true });
+        scheduleRender({ sidebar: currentMode === 'discord', main: currentMode === 'discord' });
         bumpUnread('discord');
         if (isNotifyEnabled()) {
           playDiscordBeep();
@@ -2688,7 +2781,7 @@
           || prev.edited_at !== payload.new.edited_at;
         allDiscordMessages[idx] = payload.new;
         if (!displayChanged) return;
-        scheduleRender({ sidebar: true, main: true });
+        scheduleRender({ sidebar: currentMode === 'discord', main: currentMode === 'discord' });
         if (!textChanged) return;
         bumpUnread('discord');
         if (isNotifyEnabled()) {
@@ -3276,7 +3369,7 @@
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'comments' }, (payload) => {
         allComments.unshift(payload.new);
         if (allComments.length > 1500) allComments.pop();
-        scheduleRender({ sidebar: true, main: true });
+        scheduleRender({ sidebar: true, main: currentMode === 'comments' });
         document.getElementById('statusText').textContent = 'คอมเมนต์ใหม่ ' + new Date().toLocaleTimeString('th-TH');
         bumpUnread('comments');
         if (isNotifyEnabled()) {
@@ -3300,7 +3393,7 @@
           || prev.edited_at !== payload.new.edited_at;
         allComments[idx] = payload.new;
         if (!displayChanged) return;
-        scheduleRender({ sidebar: true, main: true });
+        scheduleRender({ sidebar: true, main: currentMode === 'comments' });
         if (!textChanged) return;   // permalink backfills etc. shouldn't alert anyone
         document.getElementById('statusText').textContent = 'คอมเมนต์ถูกแก้ไข ' + new Date().toLocaleTimeString('th-TH');
         bumpUnread('comments');
@@ -3314,7 +3407,7 @@
         if (!allPosts.some(p => p.post_id === payload.new.post_id)) {
           allPosts.unshift(payload.new);
           if (allPosts.length > 800) allPosts.pop();
-          scheduleRender({ sidebar: true, main: currentMode === 'posts' || currentMode === 'dashboard' });
+          scheduleRender({ sidebar: true, main: currentMode === 'posts' });
         }
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'posts' }, (payload) => {
@@ -3326,7 +3419,7 @@
           || prev.post_permalink !== payload.new.post_permalink;
         allPosts[idx] = payload.new;
         if (!displayChanged) return;
-        scheduleRender({ sidebar: true, main: currentMode === 'posts' || currentMode === 'dashboard' });
+        scheduleRender({ sidebar: true, main: currentMode === 'posts' });
       })
       .subscribe();
   }
