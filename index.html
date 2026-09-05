@@ -15,7 +15,7 @@
     --panel-hover: #1c2129;
     --border: #262b34;
     --text: #e6e8eb;
-    --muted: #8b95a1;
+    --muted: #a5b0bd;
     --zone4: #38bdf8;
     --tosm: #f97316;
     --accent: #22c55e;
@@ -30,7 +30,7 @@
     --panel-hover: #f0f1f3;
     --border: #e2e5ea;
     --text: #1a1d23;
-    --muted: #6b7280;
+    --muted: #57616f;
     --shadow: 0 1px 2px rgba(20,23,30,0.06), 0 1px 8px rgba(20,23,30,0.05);
     --shadow-hover: 0 4px 14px rgba(20,23,30,0.10);
   }
@@ -86,14 +86,14 @@
   }
   .subtitle {
     font-family: 'IBM Plex Mono', monospace;
-    font-size: 11px;
+    font-size: 12px;
     color: var(--muted);
     margin-top: 2px;
   }
   .header-right { display: flex; align-items: center; gap: 14px; justify-content: flex-end; }
   .status {
     font-family: 'IBM Plex Mono', monospace;
-    font-size: 11px;
+    font-size: 12px;
     color: var(--muted);
     display: flex;
     align-items: center;
@@ -136,7 +136,7 @@
     color: var(--text);
     font-family: 'Prompt', sans-serif;
     font-weight: 600;
-    font-size: 12px;
+    font-size: 12.5px;
     display: flex;
     align-items: center;
     gap: 8px;
@@ -159,7 +159,7 @@
   .login-avatar {
     width: 24px; height: 24px; border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
-    font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 700;
+    font-family: 'IBM Plex Mono', monospace; font-size: 12px; font-weight: 700;
     color: #0f1115; flex-shrink: 0;
   }
   .login-email {
@@ -258,7 +258,7 @@
   .search-box svg { flex-shrink: 0; color: var(--muted); }
 
   .sidebar-title {
-    font-size: 11px;
+    font-size: 12px;
     text-transform: uppercase;
     letter-spacing: 0.5px;
     color: var(--muted);
@@ -288,7 +288,7 @@
     border: 1px solid currentColor;
     background: transparent;
     font-family: 'IBM Plex Mono', monospace;
-    font-size: 12px;
+    font-size: 12.5px;
     font-weight: 700;
     display: flex;
     align-items: center;
@@ -310,7 +310,7 @@
   }
   .sidebar-group-count {
     font-family: 'IBM Plex Mono', monospace;
-    font-size: 10.5px;
+    font-size: 11.5px;
     flex-shrink: 0;
     margin-left: 8px;
   }
@@ -325,7 +325,7 @@
     flex: 1;
     font-family: 'Prompt', sans-serif;
     font-weight: 600;
-    font-size: 12px;
+    font-size: 12.5px;
     padding: 8px 6px;
     border-radius: 8px;
     border: 1px solid var(--border);
@@ -357,12 +357,12 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    font-size: 10px;
+    font-size: 11.5px;
     color: var(--muted);
     font-family: 'IBM Plex Mono', monospace;
   }
   .post-tag {
-    font-size: 9px;
+    font-size: 11px;
     padding: 1px 6px;
     border-radius: 999px;
     text-transform: uppercase;
@@ -372,7 +372,7 @@
   .post-tag.discord { background: rgba(88,101,242,0.15); color: var(--discord); }
   .cat-select {
     font-family: 'Prompt', sans-serif;
-    font-size: 10px;
+    font-size: 11.5px;
     font-weight: 600;
     padding: 2px 6px;
     border-radius: 999px;
@@ -384,7 +384,7 @@
   .cat-select.manual { border-width: 2px; }
   .edited-tag {
     font-family: 'Prompt', sans-serif;
-    font-size: 10px;
+    font-size: 11.5px;
     font-weight: 600;
     padding: 2px 8px;
     border-radius: 999px;
@@ -414,7 +414,7 @@
   .active-filter-bar.show { display: flex; }
   .clear-filter {
     font-family: 'IBM Plex Mono', monospace;
-    font-size: 11px;
+    font-size: 12px;
     color: var(--muted);
     cursor: pointer;
     border: 1px solid var(--border);
@@ -440,7 +440,7 @@
   .archive-btn {
     display: flex; align-items: center; gap: 5px;
     font-family: 'Prompt', sans-serif;
-    font-size: 11px; font-weight: 600;
+    font-size: 12px; font-weight: 600;
     padding: 4px 10px; border-radius: 999px;
     border: 1px solid var(--border);
     background: var(--panel-hover);
@@ -453,7 +453,7 @@
   .reply-toggle-btn {
     display: flex; align-items: center; gap: 5px;
     font-family: 'Prompt', sans-serif;
-    font-size: 11px; font-weight: 600;
+    font-size: 12px; font-weight: 600;
     padding: 4px 10px; border-radius: 999px;
     border: 1px solid var(--border);
     background: var(--panel-hover);
@@ -487,15 +487,15 @@
     background: var(--panel-hover);
     color: var(--text);
     font-family: 'Prompt', sans-serif;
-    font-size: 12px;
+    font-size: 12.5px;
   }
   .reply-send-btn {
-    font-family: 'Prompt', sans-serif; font-size: 12px; font-weight: 600;
+    font-family: 'Prompt', sans-serif; font-size: 12.5px; font-weight: 600;
     padding: 6px 14px; border-radius: 999px; border: none;
     background: var(--accent); color: white; cursor: pointer;
   }
   .reply-send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-  .reply-status { font-size: 11px; color: var(--muted); font-family: 'IBM Plex Mono', monospace; }
+  .reply-status { font-size: 12px; color: var(--muted); font-family: 'IBM Plex Mono', monospace; }
   @keyframes fadeIn {
     from { opacity: 0; transform: translateY(-4px); }
     to { opacity: 1; transform: translateY(0); }
@@ -514,7 +514,7 @@
   .comment-top-right { display: flex; align-items: center; gap: 8px; }
   .tag {
     font-family: 'IBM Plex Mono', monospace;
-    font-size: 10px; padding: 2px 8px; border-radius: 999px;
+    font-size: 11.5px; padding: 2px 8px; border-radius: 999px;
     text-transform: uppercase; letter-spacing: 0.5px;
   }
   .tag.zone4 { background: rgba(56,189,248,0.15); color: var(--zone4); }
@@ -523,7 +523,7 @@
   .follow-btn {
     display: flex; align-items: center; gap: 5px;
     font-family: 'Prompt', sans-serif;
-    font-size: 11px; font-weight: 600;
+    font-size: 12px; font-weight: 600;
     padding: 4px 10px; border-radius: 999px;
     border: 1px solid var(--border);
     background: var(--panel-hover);
@@ -550,7 +550,7 @@
   }
   .meta {
     margin-top: 10px; display: flex; justify-content: space-between; align-items: center;
-    font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--muted);
   }
   .meta a {
     color: white;
@@ -567,7 +567,7 @@
   .meta a:hover { opacity: 0.85; color: white; }
   .time-block { display: flex; flex-direction: column; gap: 1px; }
   .time-block .relative { font-weight: 500; }
-  .time-block .absolute { font-size: 10px; opacity: 0.75; }
+  .time-block .absolute { font-size: 11.5px; opacity: 0.9; }
 
   /* ---------- Post archive cards ---------- */
   .post-card {
@@ -592,7 +592,7 @@
     border: 1px solid var(--border);
   }
   .post-card-footer { display: flex; justify-content: space-between; align-items: center; }
-  .post-card-footer .left { display: flex; gap: 14px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--muted); }
+  .post-card-footer .left { display: flex; gap: 14px; font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--muted); }
   .archive-section-title {
     font-family: 'Prompt', sans-serif;
     font-size: 15px; font-weight: 700;
@@ -600,10 +600,10 @@
     display: flex; align-items: center; gap: 8px;
   }
   .archive-section-title:first-child { margin-top: 0; }
-  .archive-section-count { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--muted); font-weight: 400; }
+  .archive-section-count { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--muted); font-weight: 400; }
   .view-comments-btn {
     font-family: 'Prompt', sans-serif;
-    font-size: 12px; font-weight: 600;
+    font-size: 12.5px; font-weight: 600;
     padding: 6px 14px; border-radius: 999px;
     border: 1px solid var(--border);
     background: var(--panel-hover);
@@ -612,7 +612,7 @@
   }
   .fb-btn {
     font-family: 'Prompt', sans-serif;
-    font-size: 12px; font-weight: 600;
+    font-size: 12.5px; font-weight: 600;
     padding: 6px 14px; border-radius: 999px;
     background: #1877F2;
     color: white;
@@ -646,7 +646,7 @@
     line-height: 1.1;
   }
   .dash-card .label {
-    font-size: 12px;
+    font-size: 12.5px;
     color: var(--muted);
     margin-top: 6px;
   }
@@ -662,7 +662,7 @@
     border-bottom: 1px solid var(--border);
   }
   .dash-toolbar-title { font-family: 'Prompt', sans-serif; font-weight: 700; font-size: 17px; }
-  .dash-toolbar-sub { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--muted); margin-top: 3px; }
+  .dash-toolbar-sub { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--muted); margin-top: 3px; }
   .dash-actions { display: flex; gap: 8px; flex-wrap: wrap; }
   .dash-action {
     display: inline-flex; align-items: center; gap: 6px;
@@ -692,48 +692,80 @@
   .dash-card.hero { grid-column: span 2; }
   .dash-card.hero .num { font-size: 40px; }
   .dash-card.clickable { cursor: pointer; }
-  .dash-delta { font-family: 'IBM Plex Mono', monospace; font-size: 12px; margin-left: 8px; }
+  .dash-delta { font-family: 'IBM Plex Mono', monospace; font-size: 12.5px; margin-left: 8px; }
   .dash-delta.up { color: #ef4444; }
   .dash-delta.down { color: var(--accent); }
   .dash-delta.flat { color: var(--muted); }
 
   .cat-side-head {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    padding: 2px 4px 12px;
+    padding: 4px 4px 14px;
     border-bottom: 1px solid var(--border);
-    margin-bottom: 10px;
+    margin-bottom: 14px;
   }
-  .cat-side-total { font-family: 'IBM Plex Mono', monospace; font-size: 22px; font-weight: 600; }
-  .cat-side-total-label { font-size: 11px; color: var(--muted); margin-top: 2px; }
-  .cat-side-window { font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; color: var(--muted); }
+  .cat-side-eyebrow {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.7px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+  .cat-side-total {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 30px;
+    font-weight: 600;
+    line-height: 1.1;
+  }
+  .cat-side-total-label { font-size: 12.5px; color: var(--muted); margin-top: 4px; }
+  /* Composition bar: the whole mix in one glance, above the itemised rows. */
+  .cat-stack {
+    display: flex;
+    height: 7px;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-top: 14px;
+    gap: 2px;
+  }
+  .cat-stack span { height: 100%; }
+
   .cat-row {
-    padding: 10px;
-    border-radius: 9px;
+    padding: 11px 12px;
+    border-radius: 10px;
     border: 1px solid transparent;
     cursor: pointer;
-    margin-bottom: 4px;
-    transition: background 0.15s, border-color 0.15s;
+    margin-bottom: 6px;
+    background: var(--panel);
+    transition: background 0.15s, border-color 0.15s, transform 0.15s;
   }
-  .cat-row:hover { background: var(--panel-hover); }
-  .cat-row.spiking { border-color: rgba(239,68,68,0.5); background: rgba(239,68,68,0.07); }
-  .cat-row-top { display: flex; align-items: center; gap: 7px; margin-bottom: 7px; }
-  .cat-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .cat-row:hover { background: var(--panel-hover); border-color: var(--border); transform: translateX(2px); }
+  .cat-row.spiking { border-color: rgba(239,68,68,0.55); background: rgba(239,68,68,0.09); }
+  .cat-row-top { display: flex; align-items: center; gap: 9px; margin-bottom: 9px; }
+  .cat-dot { width: 9px; height: 9px; border-radius: 3px; flex-shrink: 0; }
   .cat-name {
-    font-family: 'Prompt', sans-serif; font-weight: 600; font-size: 12.5px;
+    font-family: 'Prompt', sans-serif; font-weight: 600; font-size: 13.5px;
     flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
-  .cat-count { font-family: 'IBM Plex Mono', monospace; font-size: 14px; font-weight: 600; flex-shrink: 0; }
-  .cat-bar { height: 5px; background: var(--panel-hover); border-radius: 3px; overflow: hidden; margin-bottom: 7px; }
+  .cat-count { font-family: 'IBM Plex Mono', monospace; font-size: 16px; font-weight: 600; flex-shrink: 0; }
+  .cat-bar { height: 5px; background: var(--panel-hover); border-radius: 3px; overflow: hidden; margin-bottom: 9px; }
+  .cat-bar > div { height: 100%; border-radius: 3px; }
   .cat-foot {
-    display: flex; justify-content: space-between; align-items: center; gap: 6px;
-    font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; color: var(--muted);
+    display: flex; justify-content: space-between; align-items: center; gap: 8px;
+    font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--muted);
   }
+  .cat-24h { color: var(--text); }
   .cat-spike-badge {
-    font-family: 'Prompt', sans-serif; font-weight: 700; font-size: 10px;
-    padding: 1px 7px; border-radius: 999px;
-    background: rgba(239,68,68,0.18); color: #ef4444;
+    font-family: 'Prompt', sans-serif; font-weight: 700; font-size: 11.5px;
+    padding: 2px 9px; border-radius: 999px;
+    background: rgba(239,68,68,0.2); color: #ef4444;
+  }
+  .cat-side-foot {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11.5px;
+    color: var(--muted);
+    padding: 12px 4px 0;
+    margin-top: 6px;
+    border-top: 1px solid var(--border);
+    line-height: 1.7;
   }
 
   .dash-platform-title {
@@ -771,7 +803,7 @@
   }
   .dash-pill {
     font-family: 'IBM Plex Mono', monospace;
-    font-size: 12px;
+    font-size: 12.5px;
     padding: 6px 12px;
     border-radius: 999px;
     border: 1px solid var(--border);
@@ -802,7 +834,7 @@
   }
   .top-post-row .count {
     font-family: 'IBM Plex Mono', monospace;
-    font-size: 12px;
+    font-size: 12.5px;
     color: var(--muted);
     flex-shrink: 0;
   }
@@ -819,19 +851,19 @@
     margin-bottom: 8px;
     box-shadow: var(--shadow);
   }
-  .audit-row-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 12px; }
+  .audit-row-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 12.5px; }
   .audit-email { font-weight: 600; }
-  .audit-time { color: var(--muted); font-family: 'IBM Plex Mono', monospace; font-size: 11px; }
+  .audit-time { color: var(--muted); font-family: 'IBM Plex Mono', monospace; font-size: 12px; }
   .audit-message { font-size: 13px; line-height: 1.5; }
   .category-tag {
     font-family: 'Prompt', sans-serif;
-    font-size: 10px; font-weight: 600;
+    font-size: 11.5px; font-weight: 600;
     padding: 2px 9px; border-radius: 999px;
     background: rgba(167,139,250,0.15); color: #a78bfa;
   }
   .audit-filters { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
   .audit-filter-chip {
-    font-family: 'Prompt', sans-serif; font-size: 12px; font-weight: 500;
+    font-family: 'Prompt', sans-serif; font-size: 12.5px; font-weight: 500;
     padding: 5px 12px; border-radius: 999px;
     border: 1px solid var(--border); background: var(--panel); color: var(--muted); cursor: pointer;
     transition: background 0.15s, border-color 0.15s, color 0.15s;
@@ -890,9 +922,9 @@
   }
   .user-row:hover { box-shadow: var(--shadow-hover); transform: translateY(-1px); }
   .user-name { font-family: 'Prompt', sans-serif; font-weight: 600; font-size: 13.5px; }
-  .user-email { font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+  .user-email { font-family: 'IBM Plex Mono', monospace; font-size: 12.5px; color: var(--muted); margin-top: 2px; }
   .role-badge {
-    font-family: 'Prompt', sans-serif; font-weight: 700; font-size: 10px;
+    font-family: 'Prompt', sans-serif; font-weight: 700; font-size: 11.5px;
     padding: 2px 9px; border-radius: 999px; letter-spacing: 0.3px; flex-shrink: 0;
   }
   .role-badge.administrator {
@@ -904,9 +936,9 @@
     border: 1px solid var(--border);
     color: var(--muted);
   }
-  .user-added-at { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--muted); white-space: nowrap; }
+  .user-added-at { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--muted); white-space: nowrap; }
   .user-row .remove-user-btn {
-    font-family: 'Prompt', sans-serif; font-size: 11px; font-weight: 600;
+    font-family: 'Prompt', sans-serif; font-size: 12px; font-weight: 600;
     padding: 4px 10px; border-radius: 999px; border: 1px solid var(--border);
     background: transparent; color: #ef4444; cursor: pointer;
     transition: background 0.15s, border-color 0.15s;
@@ -916,7 +948,7 @@
   /* ---------- Archived filter toggle ---------- */
   .archive-filter-toggle {
     font-family: 'IBM Plex Mono', monospace;
-    font-size: 11px;
+    font-size: 12px;
     color: var(--muted);
     cursor: pointer;
     border: 1px solid var(--border);
@@ -974,7 +1006,7 @@
     background: #ef4444;
     color: white;
     font-family: 'IBM Plex Mono', monospace;
-    font-size: 10px;
+    font-size: 11.5px;
     font-weight: 700;
     line-height: 17px;
     text-align: center;
@@ -1004,7 +1036,7 @@
   /* ---------- Bulk selection ---------- */
   .select-toggle-btn {
     font-family: 'IBM Plex Mono', monospace;
-    font-size: 11px;
+    font-size: 12px;
     color: var(--muted);
     cursor: pointer;
     border: 1px solid var(--border);
@@ -1046,7 +1078,7 @@
   .bulk-actions { display: flex; gap: 8px; flex-wrap: wrap; }
   .bulk-btn {
     font-family: 'Prompt', sans-serif;
-    font-size: 12px;
+    font-size: 12.5px;
     font-weight: 600;
     padding: 6px 13px;
     border-radius: 999px;
@@ -1272,15 +1304,15 @@
     display:flex; align-items:center; justify-content:center;
   }
   .login-modal-brand .brand-title { font-family:'Prompt',sans-serif; font-weight:700; font-size:16px; letter-spacing:0.3px; }
-  .login-modal-brand .brand-sub { font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:var(--muted); }
+  .login-modal-brand .brand-sub { font-family:'IBM Plex Mono',monospace; font-size:11.5px; color:var(--muted); }
   .login-modal-header { display:flex; justify-content:space-between; align-items:center; font-family:'Prompt',sans-serif; font-weight:600; font-size:15px; margin-bottom:10px; }
   .login-modal-overlay.forced .login-modal-header { display:none; }
   .login-modal-close { background:none; border:none; color:var(--muted); cursor:pointer; font-size:14px; }
-  .login-modal-desc { font-size:12px; color:var(--muted); margin:0 0 10px; text-align:center; }
+  .login-modal-desc { font-size:12.5px; color:var(--muted); margin:0 0 10px; text-align:center; }
   .login-input { width:100%; padding:11px 12px; border-radius:8px; border:1px solid var(--border); background:var(--panel-hover); color:var(--text); font-family:'IBM Plex Mono',monospace; font-size:14px; margin-bottom:10px; box-sizing:border-box; }
   .login-submit-btn { width:100%; padding:11px; border-radius:8px; border:none; background:var(--accent); color:white; font-family:'Prompt',sans-serif; font-weight:600; font-size:13px; cursor:pointer; transition:opacity 0.15s; }
   .login-submit-btn:hover { opacity:0.9; }
-  .login-status { font-size:11px; color:var(--muted); margin-top:8px; font-family:'IBM Plex Mono',monospace; text-align:center; }
+  .login-status { font-size:12px; color:var(--muted); margin-top:8px; font-family:'IBM Plex Mono',monospace; text-align:center; }
 </style>
 
 <script>
@@ -2438,11 +2470,12 @@
 
     setHtmlIfChanged(list, `
       <div class="cat-side-head">
-        <div>
-          <div class="cat-side-total">${total.toLocaleString('th-TH')}</div>
-          <div class="cat-side-total-label">${fromDatabase ? 'คอมเมนต์ทั้งหมด' : 'คอมเมนต์ที่โหลดไว้'}</div>
+        <div class="cat-side-eyebrow">หมวดหมู่คอมเมนต์</div>
+        <div class="cat-side-total">${total.toLocaleString('th-TH')}</div>
+        <div class="cat-side-total-label">${fromDatabase ? 'คอมเมนต์ทั้งหมด' : 'คอมเมนต์ที่โหลดไว้'} · ${ordered.length} หมวด</div>
+        <div class="cat-stack">
+          ${ordered.map(cat => `<span style="flex:${counts[cat]};background:${CATEGORY_COLORS[cat] || '#8b95a1'};" title="${escapeHtml(cat)} ${counts[cat]}"></span>`).join('')}
         </div>
-        <div class="cat-side-window">${ordered.length} หมวด</div>
       </div>
 
       ${ordered.map(cat => {
@@ -2457,18 +2490,16 @@
               <span class="cat-name" style="color:${color};">${escapeHtml(cat)}</span>
               <span class="cat-count">${counts[cat].toLocaleString('th-TH')}</span>
             </div>
-            <div class="cat-bar"><div style="width:${pct}%;height:100%;background:${color};"></div></div>
+            <div class="cat-bar"><div style="width:${pct}%;background:${color};"></div></div>
             <div class="cat-foot">
-              <span>${recent[cat] ? '24 ชม. ' + recent[cat] : '24 ชม. —'}</span>
-              ${isSpiking ? `<span class="cat-spike-badge">▲ ${spike.multiple}×</span>` : `<span>${share}%</span>`}
+              <span>24 ชม. <span class="cat-24h">${recent[cat] ? recent[cat].toLocaleString('th-TH') : '0'}</span></span>
+              ${isSpiking ? `<span class="cat-spike-badge">▲ ${spike.multiple}× ผิดปกติ</span>` : `<span>${share}% ของทั้งหมด</span>`}
             </div>
           </div>
         `;
       }).join('')}
 
-      <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted);padding:8px 10px 0;line-height:1.6;">
-        ${windowLabel} · ไม่รวมที่เก็บถาวร
-      </div>
+      <div class="cat-side-foot">${windowLabel}<br>ไม่รวมคอมเมนต์ที่เก็บถาวรแล้ว</div>
     `);
   }
 
@@ -2643,7 +2674,7 @@
           </div>
           <div class="comment-top-right">
             <button class="reply-toggle-btn" data-comment-id="${escapeHtml(c.comment_id)}" data-page-name="${escapeHtml(c.page_name)}" title="ตอบกลับคอมเมนต์นี้">↩ ตอบกลับ</button>
-            ${followed ? `<select class="category-select follow-category-select" style="margin-top:0;width:auto;padding:4px 8px;font-size:11px;" data-comment-id="${escapeHtml(c.comment_id)}">
+            ${followed ? `<select class="category-select follow-category-select" style="margin-top:0;width:auto;padding:4px 8px;font-size:12px;" data-comment-id="${escapeHtml(c.comment_id)}">
               ${REPLY_CATEGORIES.map(cat => `<option value="${escapeHtml(cat)}" ${followCategories[c.comment_id] === cat ? 'selected' : ''}>${escapeHtml(cat)}</option>`).join('')}
             </select>` : ''}
             <button class="follow-btn ${followed ? 'on' : ''}" data-comment-id="${escapeHtml(c.comment_id)}" title="ติดตามคอมเมนต์นี้เพื่อติดตามปัญหา">
@@ -2811,8 +2842,8 @@
         <div class="post-card-top">
           <span class="tag ${tagClass(p.page_name)}">${escapeHtml(p.page_name)}</span>
           <span class="time-block" style="align-items:flex-end;">
-            <span class="relative" style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);">${timeAgo(p.latest)}</span>
-            <span class="absolute" style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted);opacity:0.75;">${fullDate(p.latest)}</span>
+            <span class="relative" style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--muted);">${timeAgo(p.latest)}</span>
+            <span class="absolute" style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--muted);opacity:0.9;">${fullDate(p.latest)}</span>
           </span>
         </div>
         ${p.post_image_url ? `<div class="post-card-image"><a href="${escapeHtml(p.post_image_url)}" target="_blank" rel="noopener"><img src="${escapeHtml(p.post_image_url)}" loading="lazy" alt="รูปภาพโพสต์"></a></div>` : ''}
@@ -3473,7 +3504,7 @@
           responsive: true,
           interaction: { mode: 'index', intersect: false },
           plugins: {
-            legend: { position: 'bottom', labels: { color: textColor, boxWidth: 12, font: { size: 11 } } },
+            legend: { position: 'bottom', labels: { color: textColor, boxWidth: 12, font: { size: 12 } } },
             title: { display: true, text: 'แนวโน้มหมวดหมู่ 14 วันล่าสุด' + (categoryTrend ? '' : ' (จากข้อมูลที่โหลดในหน้านี้)'), color: textColor },
           },
           scales: {
@@ -3498,7 +3529,7 @@
         options: {
           responsive: true,
           plugins: {
-            legend: { position: 'bottom', labels: { color: textColor, boxWidth: 12, font: { size: 11 } } },
+            legend: { position: 'bottom', labels: { color: textColor, boxWidth: 12, font: { size: 12 } } },
             title: { display: true, text: 'สัดส่วนหมวดหมู่', color: textColor },
           },
         },
