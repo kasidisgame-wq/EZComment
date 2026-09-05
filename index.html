@@ -2126,7 +2126,7 @@
     clearUnread(currentMode);
     // Refresh the aggregate on entering the dashboard — it's ~70 rows, so
     // this is far cheaper than re-running it on every incoming comment.
-    if (currentMode === 'dashboard') loadCategoryTrend();
+    if (currentMode === 'dashboard') { loadCategoryTrend(); loadCategorySummary(); }
     renderMain();
   });
 
@@ -2409,27 +2409,26 @@
       return;
     }
 
-    // Totals come from the loaded feed; the 24h figure and the spike flag come
-    // from the server aggregate when it's available, since that covers the
-    // full window rather than just what's been loaded.
-    const counts = {};
-    live.forEach(c => { const k = categoryOf(c); counts[k] = (counts[k] || 0) + 1; });
-
-    const recent = {};
-    let windowLabel = 'จาก ' + live.length.toLocaleString('th-TH') + ' คอมเมนต์ที่โหลดไว้';
-    if (categoryTrend) {
-      const dayKeys = Object.keys(categoryTrend).sort();
-      const today = dayKeys[dayKeys.length - 1];
-      Object.entries(categoryTrend[today] || {}).forEach(([cat, n]) => { recent[cat] = n; });
-      windowLabel = 'ตัวเลข 24 ชม. จากฐานข้อมูล';
+    // Prefer the database summary: totals across every comment and a true
+    // rolling-24h window. Mixing a loaded-only total with a database 24h
+    // figure made the percentages meaningless, so both come from one source
+    // or neither does.
+    let counts = {}, recent = {}, windowLabel, fromDatabase = false;
+    if (categorySummary) {
+      Object.entries(categorySummary).forEach(([cat, v]) => {
+        counts[cat] = v.total;
+        recent[cat] = v.last24h;
+      });
+      windowLabel = 'นับจากคอมเมนต์ทั้งหมดในฐานข้อมูล';
+      fromDatabase = true;
     } else {
       const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
       live.forEach(c => {
-        if (c.created_time && c.created_time >= dayAgo) {
-          const k = categoryOf(c);
-          recent[k] = (recent[k] || 0) + 1;
-        }
+        const k = categoryOf(c);
+        counts[k] = (counts[k] || 0) + 1;
+        if (c.created_time && c.created_time >= dayAgo) recent[k] = (recent[k] || 0) + 1;
       });
+      windowLabel = 'จาก ' + live.length.toLocaleString('th-TH') + ' คอมเมนต์ล่าสุดที่โหลดไว้';
     }
 
     const spike = detectCategorySpike();
@@ -2441,7 +2440,7 @@
       <div class="cat-side-head">
         <div>
           <div class="cat-side-total">${total.toLocaleString('th-TH')}</div>
-          <div class="cat-side-total-label">คอมเมนต์ที่จัดหมวดแล้ว</div>
+          <div class="cat-side-total-label">${fromDatabase ? 'คอมเมนต์ทั้งหมด' : 'คอมเมนต์ที่โหลดไว้'}</div>
         </div>
         <div class="cat-side-window">${ordered.length} หมวด</div>
       </div>
@@ -3191,6 +3190,18 @@
     });
     categoryTrend = byDay;
     if (currentMode === 'dashboard') renderDashboard();
+  }
+
+  // Category totals over the whole table, plus a true rolling-24h count.
+  // Five rows, so this is cheaper than the comments it replaces counting.
+  let categorySummary = null;
+  async function loadCategorySummary() {
+    const { data, error } = await supabaseClient.rpc('category_summary');
+    if (error) { console.error('loadCategorySummary failed', error); return; }
+    const out = {};
+    (data || []).forEach(r => { out[r.category] = { total: Number(r.total), last24h: Number(r.last_24h) }; });
+    categorySummary = out;
+    if (currentMode === 'dashboard') { renderCategorySidebar(); renderDashboard(); }
   }
 
   async function loadDiscordDashboardStats() {
@@ -3951,7 +3962,7 @@
     loadFollows().then(subscribeFollowsRealtime);
     loadArchives().then(subscribeArchivesRealtime);
     loadDiscordArchives().then(subscribeDiscordArchivesRealtime);
-    loadCategoryRules().then(() => { loadManualCategories().then(subscribeCategoriesRealtime); loadCategoryTrend(); });
+    loadCategoryRules().then(() => { loadManualCategories().then(subscribeCategoriesRealtime); loadCategoryTrend(); loadCategorySummary(); });
     loadInitial();
     subscribeRealtime();
     loadDashboardStats();
@@ -4010,6 +4021,7 @@
     loadDashboardStats();
     loadDiscordDashboardStats();
     loadCategoryTrend();
+    loadCategorySummary();
   }
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible' && appInitialized) resyncNow();
