@@ -692,6 +692,14 @@
   .dash-card.hero { grid-column: span 2; }
   .dash-card.hero .num { font-size: 40px; }
   .dash-card.clickable { cursor: pointer; }
+  .dash-sub {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border);
+  }
   .dash-delta { font-family: 'IBM Plex Mono', monospace; font-size: 12.5px; margin-left: 8px; }
   .dash-delta.up { color: #ef4444; }
   .dash-delta.down { color: var(--accent); }
@@ -3197,7 +3205,7 @@
   }
 
   // ---------- Dashboard ----------
-  let dashStats = { totalComments: null, totalPosts: null, today: null, yesterdaySoFar: null, zone4Count: null, tosmCount: null };
+  let dashStats = { totalComments: null, totalPosts: null, today: null, yesterdaySoFar: null, zone4Count: null, tosmCount: null, zone4Today: null, tosmToday: null };
   let discordDashStats = { totalMessages: null, today: null };
 
   async function loadDashboardStats() {
@@ -3207,13 +3215,15 @@
     // is like-for-like instead of part of today against all of yesterday.
     const yesterdayCutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     // All of these are head:true counts — they return a number, not rows.
-    const [totalC, totalP, todayC, yestC, zone4C, tosmC] = await Promise.all([
+    const [totalC, totalP, todayC, yestC, zone4C, tosmC, zone4Today, tosmToday] = await Promise.all([
       supabaseClient.from('comments').select('*', { count: 'exact', head: true }),
       supabaseClient.from('posts').select('*', { count: 'exact', head: true }),
       supabaseClient.from('comments').select('*', { count: 'exact', head: true }).gte('created_time', todayStart),
       supabaseClient.from('comments').select('*', { count: 'exact', head: true }).gte('created_time', yesterdayStart).lt('created_time', yesterdayCutoff),
       supabaseClient.from('comments').select('*', { count: 'exact', head: true }).eq('page_name', 'Zone4'),
       supabaseClient.from('comments').select('*', { count: 'exact', head: true }).eq('page_name', 'TOSM 2026'),
+      supabaseClient.from('comments').select('*', { count: 'exact', head: true }).eq('page_name', 'Zone4').gte('created_time', todayStart),
+      supabaseClient.from('comments').select('*', { count: 'exact', head: true }).eq('page_name', 'TOSM 2026').gte('created_time', todayStart),
     ]);
     dashStats = {
       totalComments: totalC.count,
@@ -3222,6 +3232,8 @@
       yesterdaySoFar: yestC.count,
       zone4Count: zone4C.count,
       tosmCount: tosmC.count,
+      zone4Today: zone4Today.count,
+      tosmToday: tosmToday.count,
     };
     if (currentMode === 'dashboard' && !dashboardBatchLoading) scheduleRender({ sidebar: true, main: true });
   }
@@ -3383,12 +3395,14 @@
           <div class="label">คอมเมนต์วันนี้ (ตั้งแต่ 00:00 น.) — คลิกเพื่อเปิดฟีด</div>
         </div>
         <div class="dash-card">
-          <div class="num">${fmt(dashStats.zone4Count)}</div>
-          <div class="label">Zone4 · สะสมทั้งหมด</div>
+          <div class="num" style="color:var(--zone4);">${fmt(dashStats.zone4Today)}</div>
+          <div class="label">Zone4 · วันนี้</div>
+          <div class="dash-sub">สะสม ${fmt(dashStats.zone4Count)}</div>
         </div>
         <div class="dash-card">
-          <div class="num">${fmt(dashStats.tosmCount)}</div>
-          <div class="label">TOSM 2026 · สะสมทั้งหมด</div>
+          <div class="num" style="color:var(--tosm);">${fmt(dashStats.tosmToday)}</div>
+          <div class="label">TOSM 2026 · วันนี้</div>
+          <div class="dash-sub">สะสม ${fmt(dashStats.tosmCount)}</div>
         </div>
         <div class="dash-card dash-quicklink clickable" data-mode="comments" data-follow-filter="true">
           <div class="num">${followedIds.size}</div>
