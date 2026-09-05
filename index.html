@@ -1783,7 +1783,9 @@
   // Order matters — the first category whose keywords match wins, so the
   // specific ones are checked before the broad ones. A question about a
   // payment failing should read as a technical problem, not as "question".
-  const CATEGORY_RULES = [
+  // Seeded here as a fallback; replaced at startup by the shared copy in the
+  // category_rules table so the browser and the SQL aggregation always agree.
+  let CATEGORY_RULES = [
     ['ปัญหาทางเทคนิค', ['เติมเงิน', 'เติมแล้ว', 'จ่ายเงินแล้ว', 'เงินหาย', 'ไม่ได้รับ', 'ไม่เข้า', 'เข้าไม่ได้',
       'ล็อกอิน', 'ล็อคอิน', 'ล๊อกอิน', 'ค้าง', 'หลุด', 'เด้ง', 'แลค', 'lag', 'บัค', 'bug', 'error',
       'ล่ม', 'ของหาย', 'ไอเทมหาย', 'โหลดไม่', 'อัปเดตไม่', 'อัพเดทไม่', 'เล่นไม่ได้', 'ใช้ไม่ได้',
@@ -1810,6 +1812,22 @@
       if (keywords.some(k => t.includes(k))) return category;
     }
     return 'ทั่วไป';
+  }
+
+  async function loadCategoryRules() {
+    const { data, error } = await supabaseClient.from('category_rules')
+      .select('category,keyword,priority').order('priority').order('id');
+    if (error || !data || data.length === 0) {
+      console.warn('using built-in category rules', error || '(table empty)');
+      return;
+    }
+    const grouped = [];
+    data.forEach(r => {
+      const existing = grouped.find(g => g[0] === r.category);
+      if (existing) existing[1].push((r.keyword || '').toLowerCase());
+      else grouped.push([r.category, [(r.keyword || '').toLowerCase()]]);
+    });
+    CATEGORY_RULES = grouped;
   }
 
   let manualCategories = {};   // comment_id -> category, set by hand and shared
@@ -2020,6 +2038,9 @@
     currentMode = btn.dataset.mode;
     resetFeedPaging();
     clearUnread(currentMode);
+    // Refresh the aggregate on entering the dashboard — it's ~70 rows, so
+    // this is far cheaper than re-running it on every incoming comment.
+    if (currentMode === 'dashboard') loadCategoryTrend();
     renderMain();
   });
 
@@ -3031,6 +3052,22 @@
     if (currentMode === 'dashboard') renderDashboard();
   }
 
+  // Daily category counts computed in the database. ~70 summary rows covering
+  // the full window, instead of inferring the trend from whatever comments
+  // happen to be loaded in the browser (which undercounted older days).
+  let categoryTrend = null;
+  async function loadCategoryTrend() {
+    const { data, error } = await supabaseClient.rpc('category_daily_counts', { p_days: 14 });
+    if (error) { console.error('loadCategoryTrend failed', error); return; }
+    const byDay = {};
+    (data || []).forEach(r => {
+      if (!byDay[r.day]) byDay[r.day] = {};
+      byDay[r.day][r.category] = Number(r.cnt);
+    });
+    categoryTrend = byDay;
+    if (currentMode === 'dashboard') renderDashboard();
+  }
+
   async function loadDiscordDashboardStats() {
     const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     const [totalD, last24D] = await Promise.all([
@@ -3202,18 +3239,26 @@
       // Category trend: one line per category over the same 14 days. The
       // totals in the sidebar say what the mix is right now; this says which
       // way it's moving, which is what actually prompts someone to act.
-      const liveComments = allComments.filter(c => !archivedIds.has(c.comment_id));
       const catDayCounts = {};
       REPLY_CATEGORIES.forEach(cat => {
         catDayCounts[cat] = {};
         days.forEach(d => { catDayCounts[cat][d] = 0; });
       });
-      liveComments.forEach(c => {
-        if (!c.created_time) return;
-        const key = c.created_time.slice(0, 10);
-        const cat = categoryOf(c);
-        if (catDayCounts[cat] && key in catDayCounts[cat]) catDayCounts[cat][key]++;
-      });
+      if (categoryTrend) {
+        days.forEach(d => {
+          Object.entries(categoryTrend[d] || {}).forEach(([cat, n]) => {
+            if (catDayCounts[cat]) catDayCounts[cat][d] = n;
+          });
+        });
+      } else {
+        // Server aggregation unavailable — fall back to counting what's loaded.
+        allComments.filter(c => !archivedIds.has(c.comment_id)).forEach(c => {
+          if (!c.created_time) return;
+          const key = c.created_time.slice(0, 10);
+          const cat = categoryOf(c);
+          if (catDayCounts[cat] && key in catDayCounts[cat]) catDayCounts[cat][key]++;
+        });
+      }
       const catTotals = {};
       REPLY_CATEGORIES.forEach(cat => {
         catTotals[cat] = days.reduce((sum, d) => sum + catDayCounts[cat][d], 0);
@@ -3242,7 +3287,7 @@
           interaction: { mode: 'index', intersect: false },
           plugins: {
             legend: { position: 'bottom', labels: { color: textColor, boxWidth: 12, font: { size: 11 } } },
-            title: { display: true, text: 'แนวโน้มหมวดหมู่ 14 วันล่าสุด (จากข้อมูลที่โหลดในหน้านี้)', color: textColor },
+            title: { display: true, text: 'แนวโน้มหมวดหมู่ 14 วันล่าสุด' + (categoryTrend ? '' : ' (จากข้อมูลที่โหลดในหน้านี้)'), color: textColor },
           },
           scales: {
             x: { ticks: { color: mutedColor }, grid: { display: false } },
@@ -3730,7 +3775,7 @@
     loadFollows().then(subscribeFollowsRealtime);
     loadArchives().then(subscribeArchivesRealtime);
     loadDiscordArchives().then(subscribeDiscordArchivesRealtime);
-    loadManualCategories().then(subscribeCategoriesRealtime);
+    loadCategoryRules().then(() => { loadManualCategories().then(subscribeCategoriesRealtime); loadCategoryTrend(); });
     loadInitial();
     subscribeRealtime();
     loadDashboardStats();
@@ -3788,6 +3833,7 @@
     loadDiscordMessages();
     loadDashboardStats();
     loadDiscordDashboardStats();
+    loadCategoryTrend();
   }
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible' && appInitialized) resyncNow();
