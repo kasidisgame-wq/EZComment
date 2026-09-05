@@ -370,6 +370,18 @@
   .post-tag.zone4 { background: rgba(56,189,248,0.15); color: var(--zone4); }
   .post-tag.tosm { background: rgba(249,115,22,0.15); color: var(--tosm); }
   .post-tag.discord { background: rgba(88,101,242,0.15); color: var(--discord); }
+  .cat-select {
+    font-family: 'Prompt', sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 999px;
+    border: 1px solid currentColor;
+    background: transparent;
+    cursor: pointer;
+    max-width: 130px;
+  }
+  .cat-select.manual { border-width: 2px; }
   .edited-tag {
     font-family: 'Prompt', sans-serif;
     font-size: 10px;
@@ -1108,6 +1120,7 @@
       <span id="activeFilterText"></span>
       <button class="clear-filter" id="clearFilterBtn">ล้างตัวกรอง ✕</button>
     </div>
+    <div class="audit-filters" id="categoryFilters" style="display:none;"></div>
     <button class="archive-filter-toggle" id="archiveFilterToggle">🗄 แสดงคอมเมนต์ที่เก็บถาวร</button>
     <button class="archive-filter-toggle" id="discordArchiveFilterToggle" style="display:none;">🗄 แสดงข้อความที่เก็บถาวร</button>
     <button class="select-toggle-btn" id="selectModeToggle">☑ เลือกหลายรายการ</button>
@@ -1208,9 +1221,17 @@
   let currentMode = 'comments'; // 'comments' | 'posts' | 'discord' | 'dashboard' | 'audit' | 'users'
   let searchQuery = '';
   const FEED_PAGE_SIZE = 60;
+  // How much history to pull on load. Every row fetched here is egress, and
+  // the feed only draws FEED_PAGE_SIZE at a time anyway, so there's no point
+  // shipping thousands of rows the person will never scroll to. "Load more"
+  // covers the rest.
+  const LOAD_COMMENTS = 500;
+  const LOAD_POSTS = 300;
+  const LOAD_DISCORD = 500;
   let feedRenderLimit = FEED_PAGE_SIZE;        // how many FB comments are currently drawn
   let discordRenderLimit = FEED_PAGE_SIZE;     // how many Discord messages are currently drawn
   let unreadCounts = { comments: 0, discord: 0 };
+  let currentCategoryFilter = 'all';
   let selectionMode = false;
   let selectedIds = new Set();          // FB comment_ids ticked for bulk action
   let selectedDiscordIds = new Set();   // Discord message_ids ticked for bulk action
@@ -1751,6 +1772,81 @@
   const MANAGE_EMAILS_FUNCTION_URL = SUPABASE_URL + '/functions/v1/manage-allowed-emails';
   const TOGGLE_ARCHIVE_FUNCTION_URL = SUPABASE_URL + '/functions/v1/toggle-archive';
   const REPLY_CATEGORIES = ['ทั่วไป', 'คำถาม', 'ข้อร้องเรียน/ปัญหา', 'คำชม', 'ปัญหาทางเทคนิค', 'อื่นๆ'];
+
+  // ---------- Automatic comment categorisation ----------
+  // Categories are derived in the browser from keyword rules rather than
+  // stored per comment: no writes, no extra egress, and the rules can be
+  // tuned here without touching the database or re-processing history.
+  // Order matters — the first category whose keywords match wins, so the
+  // specific ones are checked before the broad ones. A question about a
+  // payment failing should read as a technical problem, not as "question".
+  const CATEGORY_RULES = [
+    ['ปัญหาทางเทคนิค', ['เติมเงิน', 'เติมแล้ว', 'จ่ายเงินแล้ว', 'เงินหาย', 'ไม่ได้รับ', 'ไม่เข้า', 'เข้าไม่ได้',
+      'ล็อกอิน', 'ล็อคอิน', 'ล๊อกอิน', 'ค้าง', 'หลุด', 'เด้ง', 'แลค', 'lag', 'บัค', 'bug', 'error',
+      'ล่ม', 'ของหาย', 'ไอเทมหาย', 'โหลดไม่', 'อัปเดตไม่', 'อัพเดทไม่', 'เล่นไม่ได้', 'ใช้ไม่ได้',
+      'ติดต่อไม่ได้', 'crash', 'disconnect', 'ดิสคอน', 'เซิร์ฟล่ม', 'server']],
+    ['ข้อร้องเรียน/ปัญหา', ['ห่วย', 'แย่', 'ผิดหวัง', 'โกง', 'ไม่ยุติธรรม', 'ไม่แฟร์', 'แพง', 'เสียเวลา',
+      'ไม่พอใจ', 'ร้องเรียน', 'คืนเงิน', 'refund', 'เลิกเล่น', 'ปิดเกม', 'ด่า', 'แจ้งความ', 'หลอก']],
+    ['คำชม', ['ขอบคุณ', 'ขอบใจ', 'ดีมาก', 'สุดยอด', 'เยี่ยม', 'ประทับใจ', 'น่ารัก', 'เก่งมาก', 'ชอบมาก', 'รักเลย']],
+    ['คำถาม', ['ยังไง', 'อย่างไร', 'เมื่อไหร่', 'เมื่อไร', 'ทำไม', 'ที่ไหน', 'อะไร', 'ไหม', 'มั้ย', 'หรอ',
+      'เหรอ', 'ขอถาม', 'สอบถาม', 'กี่วัน', 'กี่โมง', '?']],
+  ];
+  const CATEGORY_COLORS = {
+    'ปัญหาทางเทคนิค': '#E24B4A',
+    'ข้อร้องเรียน/ปัญหา': '#EF9F27',
+    'คำถาม': '#378ADD',
+    'คำชม': '#1D9E75',
+    'ทั่วไป': '#8b95a1',
+    'อื่นๆ': '#a78bfa',
+  };
+
+  function autoCategory(text) {
+    const t = (text || '').toLowerCase();
+    if (!t.trim()) return 'ทั่วไป';
+    for (const [category, keywords] of CATEGORY_RULES) {
+      if (keywords.some(k => t.includes(k))) return category;
+    }
+    return 'ทั่วไป';
+  }
+
+  let manualCategories = {};   // comment_id -> category, set by hand and shared
+  function categoryOf(c) {
+    return manualCategories[c.comment_id] || autoCategory(c.message);
+  }
+  function isManualCategory(c) {
+    return Object.prototype.hasOwnProperty.call(manualCategories, c.comment_id);
+  }
+
+  async function loadManualCategories() {
+    const { data, error } = await supabaseClient.from('comment_categories').select('comment_id,category');
+    if (error) { console.error('loadManualCategories failed', error); return; }
+    manualCategories = {};
+    (data || []).forEach(r => { manualCategories[r.comment_id] = r.category; });
+  }
+  async function setCommentCategory(commentId, category) {
+    const previous = manualCategories[commentId];
+    manualCategories[commentId] = category;   // optimistic
+    renderFeed();
+    const { error } = await supabaseClient.from('comment_categories')
+      .upsert({ comment_id: commentId, category, set_by: currentSession ? currentSession.user.email : null },
+              { onConflict: 'comment_id' });
+    if (error) {
+      console.error('setCommentCategory failed', error);
+      if (previous === undefined) delete manualCategories[commentId]; else manualCategories[commentId] = previous;
+      renderFeed();
+      showToast('บันทึกหมวดหมู่ไม่สำเร็จ: ' + (error.message || ''), 'error');
+    }
+  }
+  function subscribeCategoriesRealtime() {
+    supabaseClient
+      .channel('comment-categories-feed')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'comment_categories' }, (payload) => {
+        if (payload.eventType === 'DELETE') delete manualCategories[payload.old.comment_id];
+        else manualCategories[payload.new.comment_id] = payload.new.category;
+        if (currentMode === 'comments') renderFeed();
+      })
+      .subscribe();
+  }
   let currentSession = null; // Supabase Auth session once logged in
   let pendingLoginEmail = null;
 
@@ -1935,6 +2031,14 @@
     resetFeedPaging();
     renderSidebar();
     renderMain();
+  });
+
+  document.getElementById('categoryFilters').addEventListener('click', (e) => {
+    const chip = e.target.closest('[data-cat-filter]');
+    if (!chip) return;
+    currentCategoryFilter = chip.dataset.catFilter;
+    resetFeedPaging();
+    renderFeed();
   });
 
   document.getElementById('clearFilterBtn').addEventListener('click', () => {
@@ -2233,6 +2337,7 @@
     document.getElementById('archiveFilterToggle').style.display = currentMode === 'comments' ? 'inline-block' : 'none';
     document.getElementById('discordArchiveFilterToggle').style.display = currentMode === 'discord' ? 'inline-block' : 'none';
     document.getElementById('discordSearchBoxWrap').style.display = currentMode === 'discord' ? 'flex' : 'none';
+    if (currentMode !== 'comments') document.getElementById('categoryFilters').style.display = 'none';
     updateBulkBar();
     document.querySelector('.layout').classList.toggle('no-sidebar', currentMode === 'dashboard' || currentMode === 'audit' || currentMode === 'users');
     document.getElementById('archivePageToggle').style.display = currentMode === 'posts' ? 'flex' : 'none';
@@ -2253,6 +2358,12 @@
   function renderFeed() { withPreservedFeedState(renderFeedInner); }
 
   function renderFeedInner() {
+    // Comment rows no longer carry post_message (it was duplicated on every
+    // row); look it up from the posts we already have instead.
+    const postMsg = {};
+    allPosts.forEach(p => { postMsg[p.post_id] = p.post_message || ''; });
+    const postMessageOf = (c) => postMsg[c.post_id] || c.post_message || '';
+
     let filtered = allComments;
     if (currentPage !== 'all') filtered = filtered.filter(c => c.page_name === currentPage);
     if (currentPostId) filtered = filtered.filter(c => c.post_id === currentPostId);
@@ -2264,15 +2375,30 @@
       filtered = filtered.filter(c =>
         (c.message || '').toLowerCase().includes(searchQuery) ||
         (c.from_name || '').toLowerCase().includes(searchQuery) ||
-        (c.post_message || '').toLowerCase().includes(searchQuery)
+        postMessageOf(c).toLowerCase().includes(searchQuery)
       );
     }
+
+    // Category chips are built from the set before the category filter is
+    // applied, so the counts don't collapse to zero once one is selected.
+    const catCounts = {};
+    filtered.forEach(c => { const k = categoryOf(c); catCounts[k] = (catCounts[k] || 0) + 1; });
+    const catFilterEl = document.getElementById('categoryFilters');
+    catFilterEl.style.display = 'flex';
+    setHtmlIfChanged(catFilterEl,
+      `<span class="audit-filter-chip ${currentCategoryFilter === 'all' ? 'active' : ''}" data-cat-filter="all">ทั้งหมด ${filtered.length}</span>` +
+      REPLY_CATEGORIES.filter(cat => catCounts[cat]).map(cat =>
+        `<span class="audit-filter-chip ${currentCategoryFilter === cat ? 'active' : ''}" data-cat-filter="${escapeHtml(cat)}"
+           style="${currentCategoryFilter === cat ? 'border-color:' + CATEGORY_COLORS[cat] + ';color:' + CATEGORY_COLORS[cat] + ';' : ''}">${escapeHtml(cat)} ${catCounts[cat]}</span>`
+      ).join('')
+    );
+    if (currentCategoryFilter !== 'all') filtered = filtered.filter(c => categoryOf(c) === currentCategoryFilter);
 
     const bar = document.getElementById('activeFilterBar');
     if (currentPostId) {
       const post = filtered[0];
       document.getElementById('activeFilterText').innerHTML =
-        '📌 กำลังดูคอมเมนต์เฉพาะโพสต์: "' + escapeHtml((post && post.post_message || '').substring(0, 60)) + '..."';
+        '📌 กำลังดูคอมเมนต์เฉพาะโพสต์: "' + escapeHtml((post ? postMessageOf(post) : '').substring(0, 60)) + '..."';
       bar.classList.add('show');
     } else if (followedFilterActive) {
       document.getElementById('activeFilterText').innerHTML = '🔖 กำลังดูเฉพาะคอมเมนต์ที่ติดตามอยู่';
@@ -2291,7 +2417,7 @@
       return;
     }
 
-    // Only draw a page at a time. Rendering all ~1500 comments on every
+    // Only draw a page at a time. Rendering every loaded comment on every
     // change (new message, follow, archive) made the page crawl.
     const total = filtered.length;
     const shown = Math.min(feedRenderLimit, total);
@@ -2319,6 +2445,11 @@
             <button class="archive-btn ${archived ? 'on' : ''}" data-comment-id="${escapeHtml(c.comment_id)}" data-page-name="${escapeHtml(c.page_name)}" title="${archived ? 'กู้คืนคอมเมนต์นี้' : 'เก็บถาวรคอมเมนต์นี้'}">
               ${ARCHIVE_ICON}${archived ? 'กู้คืน' : 'เก็บถาวร'}
             </button>
+            <select class="cat-select ${isManualCategory(c) ? 'manual' : ''}" data-cat-for="${escapeHtml(c.comment_id)}"
+              style="color:${CATEGORY_COLORS[categoryOf(c)] || 'var(--muted)'}"
+              title="${isManualCategory(c) ? 'ตั้งหมวดหมู่ด้วยมือ' : 'จัดหมวดหมู่อัตโนมัติ — เลือกเพื่อแก้'}">
+              ${REPLY_CATEGORIES.map(cat => `<option value="${escapeHtml(cat)}" ${categoryOf(c) === cat ? 'selected' : ''}>${escapeHtml(cat)}</option>`).join('')}
+            </select>
             <span class="tag ${tagClass(c.page_name)}">${escapeHtml(c.page_name)}</span>
             ${c.edited_at ? `<span class="edited-tag" title="แก้ไขล่าสุด ${escapeHtml(fullDate(c.edited_at))}">✏️ แก้ไขแล้ว</span>` : ''}
           </div>
@@ -2347,7 +2478,7 @@
     // card is only rebuilt when one of them really differs.
     const sigOf = (c) => [
       c.message, c.from_name, c.attachment_url, c.comment_permalink, c.post_permalink,
-      c.created_time, c.edited_at, c.page_name,
+      c.created_time, c.edited_at, c.page_name, categoryOf(c), isManualCategory(c) ? 'm' : '',
       followedIds.has(c.comment_id) ? 'f' : '', followCategories[c.comment_id] || '',
       archivedIds.has(c.comment_id) ? 'a' : '',
       selectionMode ? (selectedIds.has(c.comment_id) ? 's1' : 's0') : '',
@@ -2368,6 +2499,11 @@
     const select = e.target.closest('.follow-category-select');
     if (select) {
       updateFollowCategory(select.dataset.commentId, select.value);
+      return;
+    }
+    const catSelect = e.target.closest('.cat-select');
+    if (catSelect) {
+      setCommentCategory(catSelect.dataset.catFor, catSelect.value);
     }
   });
 
@@ -2736,7 +2872,9 @@
     const previousIds = new Set(allDiscordMessages.map(m => m.message_id));
     const isFirstLoad = allDiscordMessages.length === 0 && !hasLoadedDiscordOnce;
 
-    const { data, error } = await supabaseClient.from('discord_messages').select('*').order('created_time', { ascending: false }).limit(1000);
+    const { data, error } = await supabaseClient.from('discord_messages')
+      .select('message_id,guild_name,channel_id,channel_name,author_name,content,created_time,edited_at')
+      .order('created_time', { ascending: false }).limit(LOAD_DISCORD);
     if (error) { console.error('loadDiscordMessages failed', error); return; }
     allDiscordMessages = data || [];
     if (currentMode === 'discord') { renderDiscordChannelSidebar(); renderDiscordFeed(); }
@@ -2761,7 +2899,7 @@
       .channel('discord-messages-feed')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'discord_messages' }, (payload) => {
         allDiscordMessages.unshift(payload.new);
-        if (allDiscordMessages.length > 1000) allDiscordMessages.pop();
+        if (allDiscordMessages.length > LOAD_DISCORD) allDiscordMessages.pop();
         scheduleRender({ sidebar: currentMode === 'discord', main: currentMode === 'discord' });
         bumpUnread('discord');
         if (isNotifyEnabled()) {
@@ -3329,8 +3467,15 @@
     const isFirstLoad = allComments.length === 0 && !hasLoadedCommentsOnce;
 
     const [commentsRes, postsRes] = await Promise.all([
-      supabaseClient.from('comments').select('*').order('created_time', { ascending: false }).limit(1500),
-      supabaseClient.from('posts').select('*').order('created_time', { ascending: false }).limit(800),
+      // Only the columns the UI actually renders. Notably post_message is
+      // NOT fetched here — it's duplicated onto every comment row (200 chars
+      // each), and the same text is already available from the posts table.
+      supabaseClient.from('comments')
+        .select('comment_id,page_name,post_id,post_permalink,comment_permalink,from_name,message,created_time,attachment_url,edited_at')
+        .order('created_time', { ascending: false }).limit(LOAD_COMMENTS),
+      supabaseClient.from('posts')
+        .select('post_id,page_name,post_message,post_permalink,post_image_url,created_time')
+        .order('created_time', { ascending: false }).limit(LOAD_POSTS),
     ]);
 
     if (commentsRes.error || postsRes.error) {
@@ -3368,7 +3513,7 @@
       .channel('comments-feed')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'comments' }, (payload) => {
         allComments.unshift(payload.new);
-        if (allComments.length > 1500) allComments.pop();
+        if (allComments.length > LOAD_COMMENTS) allComments.pop();
         scheduleRender({ sidebar: true, main: currentMode === 'comments' });
         document.getElementById('statusText').textContent = 'คอมเมนต์ใหม่ ' + new Date().toLocaleTimeString('th-TH');
         bumpUnread('comments');
@@ -3406,7 +3551,7 @@
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'posts' }, (payload) => {
         if (!allPosts.some(p => p.post_id === payload.new.post_id)) {
           allPosts.unshift(payload.new);
-          if (allPosts.length > 800) allPosts.pop();
+          if (allPosts.length > LOAD_POSTS) allPosts.pop();
           scheduleRender({ sidebar: true, main: currentMode === 'posts' });
         }
       })
@@ -3430,6 +3575,7 @@
     loadFollows().then(subscribeFollowsRealtime);
     loadArchives().then(subscribeArchivesRealtime);
     loadDiscordArchives().then(subscribeDiscordArchivesRealtime);
+    loadManualCategories().then(subscribeCategoriesRealtime);
     loadInitial();
     subscribeRealtime();
     loadDashboardStats();
