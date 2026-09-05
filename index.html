@@ -2158,7 +2158,7 @@
     clearUnread(currentMode);
     // Refresh the aggregate on entering the dashboard — it's ~70 rows, so
     // this is far cheaper than re-running it on every incoming comment.
-    if (currentMode === 'dashboard') { loadCategoryTrend(); loadCategorySummary(); }
+    if (currentMode === 'dashboard') refreshDashboardData();
     renderMain();
   });
 
@@ -2586,7 +2586,7 @@
     document.querySelectorAll('.archive-page-btn').forEach(b => b.classList.toggle('active', b.dataset.page === currentPage));
     renderSidebarForMode();
     if (currentMode === 'posts') renderPostArchive();
-    else if (currentMode === 'dashboard') renderDashboard();
+    else if (currentMode === 'dashboard' && !dashboardBatchLoading) scheduleRender({ sidebar: true, main: true });
     else if (currentMode === 'audit') renderAuditLog();
     else if (currentMode === 'users') renderUsers();
     else if (currentMode === 'discord') renderDiscordFeed();
@@ -3204,7 +3204,7 @@
       zone4Count: zone4C.count,
       tosmCount: tosmC.count,
     };
-    if (currentMode === 'dashboard') renderDashboard();
+    if (currentMode === 'dashboard' && !dashboardBatchLoading) scheduleRender({ sidebar: true, main: true });
   }
 
   // Daily category counts computed in the database. ~70 summary rows covering
@@ -3220,7 +3220,7 @@
       byDay[r.day][r.category] = Number(r.cnt);
     });
     categoryTrend = byDay;
-    if (currentMode === 'dashboard') renderDashboard();
+    if (currentMode === 'dashboard' && !dashboardBatchLoading) scheduleRender({ sidebar: true, main: true });
   }
 
   // Category totals over the whole table, plus a true rolling-24h count.
@@ -3232,7 +3232,7 @@
     const out = {};
     (data || []).forEach(r => { out[r.category] = { total: Number(r.total), last24h: Number(r.last_24h) }; });
     categorySummary = out;
-    if (currentMode === 'dashboard') { renderCategorySidebar(); renderDashboard(); }
+    if (currentMode === 'dashboard' && !dashboardBatchLoading) scheduleRender({ sidebar: true, main: true });
   }
 
   async function loadDiscordDashboardStats() {
@@ -3242,7 +3242,7 @@
       supabaseClient.from('discord_messages').select('*', { count: 'exact', head: true }).gte('created_time', dayAgo),
     ]);
     discordDashStats = { totalMessages: totalD.count, last24h: last24D.count };
-    if (currentMode === 'dashboard') renderDashboard();
+    if (currentMode === 'dashboard' && !dashboardBatchLoading) scheduleRender({ sidebar: true, main: true });
   }
 
   // Flags a category that's well above its own recent norm. This is the one
@@ -3271,9 +3271,41 @@
     return best;
   }
 
+  // While this is true the individual loaders don't request a repaint; the
+  // batch renders once when every fetch has settled.
+  let dashboardBatchLoading = false;
+  async function refreshDashboardData() {
+    dashboardBatchLoading = true;
+    try {
+      await Promise.all([
+        loadDashboardStats(),
+        loadDiscordDashboardStats(),
+        loadCategoryTrend(),
+        loadCategorySummary(),
+      ]);
+    } finally {
+      dashboardBatchLoading = false;
+    }
+    if (currentMode === 'dashboard') { renderSidebarForMode(); renderDashboard(); }
+  }
+
+  let lastDashSig = null;
   function renderDashboard() {
     document.getElementById('activeFilterBar').classList.remove('show');
     const feed = document.getElementById('feed');
+
+    // Four independent loaders feed this page, and each one finishing used to
+    // trigger a full rebuild — tearing down and recreating all six charts
+    // several times per visit. Skip the work when none of the numbers the
+    // page draws have actually changed. The canvas check keeps this honest:
+    // if another view replaced the DOM, we must rebuild regardless.
+    const dashSig = JSON.stringify([
+      dashStats, discordDashStats, categorySummary, categoryTrend,
+      followedIds.size, archivedIds.size,
+      allComments.length, allPosts.length, allDiscordMessages.length,
+    ]);
+    if (lastDashSig === dashSig && feed.querySelector('#trendChart')) return;
+    lastDashSig = dashSig;
 
     const commentCounts = {};
     allComments.forEach(c => { commentCounts[c.post_id] = (commentCounts[c.post_id] || 0) + 1; });
