@@ -2214,6 +2214,22 @@
   const BOOKMARK_ICON = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>`;
   const ARCHIVE_ICON = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="2" y="4" width="20" height="5" rx="1"/><path d="M4 9v9a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9"/><path d="M10 13h4"/></svg>`;
 
+  // Bangkok is UTC+7 year-round (no DST), so shifting by 7h and reading the
+  // UTC date gives the local calendar day. Used so "today" means 00:00-23:59
+  // local time everywhere, rather than the 07:00 boundary UTC bucketing gave.
+  const BKK_OFFSET_MS = 7 * 60 * 60 * 1000;
+  function bangkokDateKey(input) {
+    const d = input instanceof Date ? input : new Date(input);
+    return new Date(d.getTime() + BKK_OFFSET_MS).toISOString().slice(0, 10);
+  }
+  // The UTC instant at which the Bangkok day `offsetDays` from today began.
+  function bangkokDayStart(offsetDays = 0) {
+    const shifted = new Date(Date.now() + BKK_OFFSET_MS);
+    shifted.setUTCHours(0, 0, 0, 0);
+    shifted.setUTCDate(shifted.getUTCDate() + offsetDays);
+    return new Date(shifted.getTime() - BKK_OFFSET_MS).toISOString();
+  }
+
   function tagClass(pageName) { return pageName === 'Zone4' ? 'zone4' : 'tosm'; }
   function timeAgo(iso) {
     if (!iso) return '';
@@ -2449,16 +2465,16 @@
     if (categorySummary) {
       Object.entries(categorySummary).forEach(([cat, v]) => {
         counts[cat] = v.total;
-        recent[cat] = v.last24h;
+        recent[cat] = v.today;
       });
       windowLabel = 'นับจากคอมเมนต์ทั้งหมดในฐานข้อมูล';
       fromDatabase = true;
     } else {
-      const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const todayStart = bangkokDayStart(0);
       live.forEach(c => {
         const k = categoryOf(c);
         counts[k] = (counts[k] || 0) + 1;
-        if (c.created_time && c.created_time >= dayAgo) recent[k] = (recent[k] || 0) + 1;
+        if (c.created_time && c.created_time >= todayStart) recent[k] = (recent[k] || 0) + 1;
       });
       windowLabel = 'จาก ' + live.length.toLocaleString('th-TH') + ' คอมเมนต์ล่าสุดที่โหลดไว้';
     }
@@ -2492,7 +2508,7 @@
             </div>
             <div class="cat-bar"><div style="width:${pct}%;background:${color};"></div></div>
             <div class="cat-foot">
-              <span>24 ชม. <span class="cat-24h">${recent[cat] ? recent[cat].toLocaleString('th-TH') : '0'}</span></span>
+              <span>วันนี้ <span class="cat-24h">${recent[cat] ? recent[cat].toLocaleString('th-TH') : '0'}</span></span>
               ${isSpiking ? `<span class="cat-spike-badge">▲ ${spike.multiple}× ผิดปกติ</span>` : `<span>${share}% ของทั้งหมด</span>`}
             </div>
           </div>
@@ -3181,26 +3197,29 @@
   }
 
   // ---------- Dashboard ----------
-  let dashStats = { totalComments: null, totalPosts: null, last24h: null, zone4Count: null, tosmCount: null };
-  let discordDashStats = { totalMessages: null, last24h: null };
+  let dashStats = { totalComments: null, totalPosts: null, today: null, yesterdaySoFar: null, zone4Count: null, tosmCount: null };
+  let discordDashStats = { totalMessages: null, today: null };
 
   async function loadDashboardStats() {
-    const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-    const twoDaysAgo = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+    const todayStart = bangkokDayStart(0);
+    const yesterdayStart = bangkokDayStart(-1);
+    // Yesterday is cut at the same clock time we're at now, so the comparison
+    // is like-for-like instead of part of today against all of yesterday.
+    const yesterdayCutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     // All of these are head:true counts — they return a number, not rows.
-    const [totalC, totalP, last24, prev24, zone4C, tosmC] = await Promise.all([
+    const [totalC, totalP, todayC, yestC, zone4C, tosmC] = await Promise.all([
       supabaseClient.from('comments').select('*', { count: 'exact', head: true }),
       supabaseClient.from('posts').select('*', { count: 'exact', head: true }),
-      supabaseClient.from('comments').select('*', { count: 'exact', head: true }).gte('created_time', dayAgo),
-      supabaseClient.from('comments').select('*', { count: 'exact', head: true }).gte('created_time', twoDaysAgo).lt('created_time', dayAgo),
+      supabaseClient.from('comments').select('*', { count: 'exact', head: true }).gte('created_time', todayStart),
+      supabaseClient.from('comments').select('*', { count: 'exact', head: true }).gte('created_time', yesterdayStart).lt('created_time', yesterdayCutoff),
       supabaseClient.from('comments').select('*', { count: 'exact', head: true }).eq('page_name', 'Zone4'),
       supabaseClient.from('comments').select('*', { count: 'exact', head: true }).eq('page_name', 'TOSM 2026'),
     ]);
     dashStats = {
       totalComments: totalC.count,
       totalPosts: totalP.count,
-      last24h: last24.count,
-      prev24h: prev24.count,
+      today: todayC.count,
+      yesterdaySoFar: yestC.count,
       zone4Count: zone4C.count,
       tosmCount: tosmC.count,
     };
@@ -3230,18 +3249,18 @@
     const { data, error } = await supabaseClient.rpc('category_summary');
     if (error) { console.error('loadCategorySummary failed', error); return; }
     const out = {};
-    (data || []).forEach(r => { out[r.category] = { total: Number(r.total), last24h: Number(r.last_24h) }; });
+    (data || []).forEach(r => { out[r.category] = { total: Number(r.total), today: Number(r.today) }; });
     categorySummary = out;
     if (currentMode === 'dashboard' && !dashboardBatchLoading) scheduleRender({ sidebar: true, main: true });
   }
 
   async function loadDiscordDashboardStats() {
-    const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-    const [totalD, last24D] = await Promise.all([
+    const todayStart = bangkokDayStart(0);
+    const [totalD, todayD] = await Promise.all([
       supabaseClient.from('discord_messages').select('*', { count: 'exact', head: true }),
-      supabaseClient.from('discord_messages').select('*', { count: 'exact', head: true }).gte('created_time', dayAgo),
+      supabaseClient.from('discord_messages').select('*', { count: 'exact', head: true }).gte('created_time', todayStart),
     ]);
-    discordDashStats = { totalMessages: totalD.count, last24h: last24D.count };
+    discordDashStats = { totalMessages: totalD.count, today: todayD.count };
     if (currentMode === 'dashboard' && !dashboardBatchLoading) scheduleRender({ sidebar: true, main: true });
   }
 
@@ -3324,12 +3343,12 @@
     const discordIcon = `<svg width="15" height="15" viewBox="0 0 24 24" fill="white"><path d="M19.5 5.5A17 17 0 0 0 15.3 4l-.3.6a13 13 0 0 1 3.6 1.3 14.6 14.6 0 0 0-13.2 0A13 13 0 0 1 9 4.6L8.7 4a17 17 0 0 0-4.2 1.5C2 9 1.3 12.4 1.6 15.8a17 17 0 0 0 5 2.5l.9-1.3a11 11 0 0 1-1.7-.8l.4-.3a12.4 12.4 0 0 0 10.6 0l.4.3a11 11 0 0 1-1.7.8l.9 1.3a17 17 0 0 0 5-2.5c.4-4-.7-7.4-2.9-10.3zM8.9 13.9c-.9 0-1.7-.9-1.7-1.9s.8-1.9 1.7-1.9 1.7.9 1.7 1.9-.8 1.9-1.7 1.9zm6.2 0c-.9 0-1.7-.9-1.7-1.9s.8-1.9 1.7-1.9 1.7.9 1.7 1.9-.8 1.9-1.7 1.9z"/></svg>`;
 
     // Direction of travel for the headline number.
-    const d24 = dashStats.last24h, p24 = dashStats.prev24h;
+    const todayN = dashStats.today, yestN = dashStats.yesterdaySoFar;
     let deltaHtml = '';
-    if (typeof d24 === 'number' && typeof p24 === 'number' && p24 > 0) {
-      const pct = Math.round(((d24 - p24) / p24) * 100);
+    if (typeof todayN === 'number' && typeof yestN === 'number' && yestN > 0) {
+      const pct = Math.round(((todayN - yestN) / yestN) * 100);
       const cls = pct > 10 ? 'up' : pct < -10 ? 'down' : 'flat';
-      deltaHtml = `<span class="dash-delta ${cls}">${pct >= 0 ? '▲' : '▼'} ${Math.abs(pct)}% เทียบ 24 ชม. ก่อน</span>`;
+      deltaHtml = `<span class="dash-delta ${cls}">${pct >= 0 ? '▲' : '▼'} ${Math.abs(pct)}% เทียบเมื่อวานเวลาเดียวกัน</span>`;
     }
 
     const spike = detectCategorySpike();
@@ -3352,7 +3371,7 @@
       <div class="dash-alert" data-spike-category="${escapeHtml(spike.category)}" title="คลิกเพื่อดูคอมเมนต์หมวดนี้">
         <span style="font-size:18px;line-height:1.2;">⚠️</span>
         <div>
-          <div class="dash-alert-title">${escapeHtml(spike.category)} เพิ่มขึ้น ${spike.multiple}× ในวันนี้</div>
+          <div class="dash-alert-title">${escapeHtml(spike.category)} เพิ่มขึ้น ${spike.multiple}× วันนี้</div>
           <div class="dash-alert-body">วันนี้ ${spike.today} คอมเมนต์ จากปกติเฉลี่ยวันละ ${spike.average} — คลิกเพื่อดูว่าเกิดอะไรขึ้น</div>
         </div>
       </div>` : ''}
@@ -3360,8 +3379,8 @@
       <div class="dash-platform-title"><span class="dash-platform-icon fb">${fbIcon}</span>Facebook — Zone4 · TOSM 2026</div>
       <div class="dash-grid">
         <div class="dash-card hero dash-quicklink clickable" data-mode="comments">
-          <div class="num">${fmt(dashStats.last24h)}${deltaHtml}</div>
-          <div class="label">คอมเมนต์ใหม่ใน 24 ชม. — คลิกเพื่อเปิดฟีด</div>
+          <div class="num">${fmt(dashStats.today)}${deltaHtml}</div>
+          <div class="label">คอมเมนต์วันนี้ (ตั้งแต่ 00:00 น.) — คลิกเพื่อเปิดฟีด</div>
         </div>
         <div class="dash-card">
           <div class="num">${fmt(dashStats.zone4Count)}</div>
@@ -3411,8 +3430,8 @@
           <div class="label">💬 ข้อความทั้งหมด</div>
         </div>
         <div class="dash-card">
-          <div class="num">${fmt(discordDashStats.last24h)}</div>
-          <div class="label">🕐 ข้อความใน 24 ชม.ล่าสุด</div>
+          <div class="num">${fmt(discordDashStats.today)}</div>
+          <div class="label">ข้อความวันนี้ (ตั้งแต่ 00:00 น.)</div>
         </div>
         <div class="dash-card dash-quicklink" data-mode="discord" style="cursor:pointer;">
           <div class="num">${Object.keys(discordChannelCounts).length}</div>
@@ -3436,15 +3455,13 @@
       const days = [];
       const dayCounts = {};
       for (let i = 13; i >= 0; i--) {
-        const d = new Date();
-        d.setDate(d.getDate() - i);
-        const key = d.toISOString().slice(0, 10);
+        const key = bangkokDateKey(Date.now() - i * 24 * 60 * 60 * 1000);
         days.push(key);
         dayCounts[key] = 0;
       }
       allComments.forEach(c => {
         if (!c.created_time) return;
-        const key = c.created_time.slice(0, 10);
+        const key = bangkokDateKey(c.created_time);
         if (key in dayCounts) dayCounts[key]++;
       });
       const trendCtx = document.getElementById('trendChart');
@@ -3504,7 +3521,7 @@
         // Server aggregation unavailable — fall back to counting what's loaded.
         allComments.filter(c => !archivedIds.has(c.comment_id)).forEach(c => {
           if (!c.created_time) return;
-          const key = c.created_time.slice(0, 10);
+          const key = bangkokDateKey(c.created_time);
           const cat = categoryOf(c);
           if (catDayCounts[cat] && key in catDayCounts[cat]) catDayCounts[cat][key]++;
         });
@@ -3572,7 +3589,7 @@
       days.forEach(d => { discordDayCounts[d] = 0; });
       allDiscordMessages.forEach(m => {
         if (!m.created_time) return;
-        const key = m.created_time.slice(0, 10);
+        const key = bangkokDateKey(m.created_time);
         if (key in discordDayCounts) discordDayCounts[key]++;
       });
       const discordTrendCtx = document.getElementById('discordTrendChart');
