@@ -395,6 +395,9 @@
 
   main { flex: 1; max-width: 860px; margin: 0 auto; padding: 20px 20px 60px; min-width: 0; }
   .layout.no-sidebar aside { display: none; }
+  /* 460px is sized for the two-column post list; the category breakdown is a
+     single column and doesn't need anywhere near that. */
+  .layout.narrow-sidebar aside { width: 270px; }
   .layout.no-sidebar main { max-width: 900px; margin: 0 auto; }
 
   .active-filter-bar {
@@ -2279,6 +2282,58 @@
     setHtmlIfChanged(list, html);
   }
 
+  // Category breakdown shown in the sidebar while the dashboard is open.
+  // Clicking a row jumps straight to the Facebook feed filtered to it, so the
+  // number is a starting point for triage rather than just a statistic.
+  function renderCategorySidebar() {
+    const list = document.getElementById('postList');
+    const live = allComments.filter(c => !archivedIds.has(c.comment_id));
+    if (live.length === 0) {
+      setHtmlIfChanged(list, `<div class="empty" style="padding:20px 8px;">${EMPTY_ICON}ยังไม่มีคอมเมนต์</div>`);
+      return;
+    }
+
+    const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const counts = {}, recent = {};
+    live.forEach(c => {
+      const k = categoryOf(c);
+      counts[k] = (counts[k] || 0) + 1;
+      if (c.created_time && c.created_time >= dayAgo) recent[k] = (recent[k] || 0) + 1;
+    });
+
+    const ordered = REPLY_CATEGORIES.filter(cat => counts[cat]).sort((a, b) => counts[b] - counts[a]);
+    const max = Math.max(...ordered.map(cat => counts[cat]));
+
+    setHtmlIfChanged(list, `
+      <div class="sidebar-group" style="margin-bottom:10px;">
+        <div class="sidebar-group-body">
+          ${ordered.map(cat => {
+            const color = CATEGORY_COLORS[cat] || '#8b95a1';
+            const pct = Math.round((counts[cat] / max) * 100);
+            return `
+              <div class="post-item" data-category="${escapeHtml(cat)}" title="คลิกเพื่อดูคอมเมนต์หมวดนี้">
+                <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:6px;">
+                  <span style="font-family:'Prompt',sans-serif;font-weight:600;font-size:12.5px;color:${color};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(cat)}</span>
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;flex-shrink:0;">${counts[cat].toLocaleString('th-TH')}</span>
+                </div>
+                <div style="height:6px;background:var(--panel-hover);border-radius:3px;overflow:hidden;margin-bottom:5px;">
+                  <div style="width:${pct}%;height:100%;background:${color};"></div>
+                </div>
+                <div class="post-meta">
+                  <span>${recent[cat] ? '24 ชม. ล่าสุด ' + recent[cat] : '\u00a0'}</span>
+                  <span>${Math.round((counts[cat] / live.length) * 100)}%</span>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--muted);padding:2px 10px;line-height:1.6;">
+        จาก ${live.length.toLocaleString('th-TH')} คอมเมนต์ที่โหลดไว้ (ไม่รวมที่เก็บถาวร)
+      </div>
+    `);
+  }
+
   document.getElementById('postList').addEventListener('click', (e) => {
     const collapseBtn = e.target.closest('.sidebar-collapse-btn');
     if (collapseBtn) {
@@ -2307,6 +2362,16 @@
     }
     const item = e.target.closest('.post-item');
     if (!item) return;
+    if (item.dataset.category !== undefined) {
+      currentCategoryFilter = item.dataset.category;
+      currentMode = 'comments';
+      clearUnread('comments');
+      document.querySelectorAll('.mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === 'comments'));
+      resetFeedPaging();
+      closeMobileSidebar();
+      renderMain();
+      return;
+    }
     if (item.dataset.channelId !== undefined) {
       selectDiscordChannel(item.dataset.channelId);
       return;
@@ -2339,13 +2404,18 @@
     document.getElementById('discordSearchBoxWrap').style.display = currentMode === 'discord' ? 'flex' : 'none';
     if (currentMode !== 'comments') document.getElementById('categoryFilters').style.display = 'none';
     updateBulkBar();
-    document.querySelector('.layout').classList.toggle('no-sidebar', currentMode === 'dashboard' || currentMode === 'audit' || currentMode === 'users');
+    document.querySelector('.layout').classList.toggle('no-sidebar', currentMode === 'audit' || currentMode === 'users');
+    document.querySelector('.layout').classList.toggle('narrow-sidebar', currentMode === 'dashboard');
     document.getElementById('archivePageToggle').style.display = currentMode === 'posts' ? 'flex' : 'none';
     document.getElementById('pageTabs').style.display = currentMode === 'discord' ? 'none' : 'flex';
-    document.getElementById('searchBoxWrap').style.display = currentMode === 'discord' ? 'none' : 'flex';
-    document.getElementById('sidebarTitle').textContent = currentMode === 'discord' ? 'ช่องสนทนา' : 'โพสต์ที่มีคอมเมนต์';
+    document.getElementById('searchBoxWrap').style.display = (currentMode === 'discord' || currentMode === 'dashboard') ? 'none' : 'flex';
+    document.getElementById('sidebarTitle').textContent =
+      currentMode === 'discord' ? 'ช่องสนทนา'
+      : currentMode === 'dashboard' ? 'หมวดหมู่คอมเมนต์'
+      : 'โพสต์ที่มีคอมเมนต์';
     document.querySelectorAll('.archive-page-btn').forEach(b => b.classList.toggle('active', b.dataset.page === currentPage));
     if (currentMode === 'discord') renderDiscordChannelSidebar();
+    else if (currentMode === 'dashboard') renderCategorySidebar();
     else renderSidebar();
     if (currentMode === 'posts') renderPostArchive();
     else if (currentMode === 'dashboard') renderDashboard();
