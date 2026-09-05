@@ -1424,7 +1424,7 @@
       const job = pendingRender;
       pendingRender = null;
       if (job.sidebar) {
-        if (currentMode === 'discord') renderDiscordChannelSidebar(); else renderSidebar();
+        renderSidebarForMode();
       }
       if (job.main) renderMain();
     }, 150);
@@ -2050,8 +2050,7 @@
     currentDiscordChannelId = null;
     currentDiscordGuild = null;
     resetFeedPaging();
-    if (currentMode === 'discord') renderDiscordChannelSidebar();
-    else renderSidebar();
+    renderSidebarForMode();
     renderMain();
   });
 
@@ -2282,6 +2281,16 @@
     setHtmlIfChanged(list, html);
   }
 
+  // Which sidebar belongs to the current mode. Anything that refreshes the
+  // sidebar without knowing the mode must go through this — a realtime event
+  // arriving while the dashboard was open used to redraw the post list over
+  // the category breakdown.
+  function renderSidebarForMode() {
+    if (currentMode === 'discord') renderDiscordChannelSidebar();
+    else if (currentMode === 'dashboard') renderCategorySidebar();
+    else renderSidebar();
+  }
+
   // Category breakdown shown in the sidebar while the dashboard is open.
   // Clicking a row jumps straight to the Facebook feed filtered to it, so the
   // number is a starting point for triage rather than just a statistic.
@@ -2393,7 +2402,7 @@
       clearUnread('comments');
       document.querySelectorAll('.mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === 'comments'));
     }
-    renderSidebar();
+    renderSidebarForMode();
     renderMain();
   }
 
@@ -2414,9 +2423,7 @@
       : currentMode === 'dashboard' ? 'หมวดหมู่คอมเมนต์'
       : 'โพสต์ที่มีคอมเมนต์';
     document.querySelectorAll('.archive-page-btn').forEach(b => b.classList.toggle('active', b.dataset.page === currentPage));
-    if (currentMode === 'discord') renderDiscordChannelSidebar();
-    else if (currentMode === 'dashboard') renderCategorySidebar();
-    else renderSidebar();
+    renderSidebarForMode();
     if (currentMode === 'posts') renderPostArchive();
     else if (currentMode === 'dashboard') renderDashboard();
     else if (currentMode === 'audit') renderAuditLog();
@@ -3090,6 +3097,11 @@
         <div class="chart-card"><canvas id="pageSplitChart"></canvas></div>
       </div>
 
+      <div style="display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-top:16px;">
+        <div class="chart-card"><canvas id="categoryTrendChart"></canvas></div>
+        <div class="chart-card"><canvas id="categorySplitChart"></canvas></div>
+      </div>
+
       <div class="dash-section-title">🔥 โพสต์ที่มีคอมเมนต์เยอะที่สุด (จากข้อมูลล่าสุดที่โหลดในหน้านี้)</div>
       ${topPosts.length === 0 ? `<div class="empty">${EMPTY_ICON}ยังไม่มีข้อมูล</div>` : topPosts.map(p => `
         <div class="top-post-row" data-post-id="${escapeHtml(p.post_id)}">
@@ -3184,6 +3196,79 @@
         options: {
           responsive: true,
           plugins: { legend: { position: 'bottom', labels: { color: textColor } }, title: { display: true, text: 'สัดส่วนคอมเมนต์ตามเพจ', color: textColor } },
+        },
+      });
+
+      // Category trend: one line per category over the same 14 days. The
+      // totals in the sidebar say what the mix is right now; this says which
+      // way it's moving, which is what actually prompts someone to act.
+      const liveComments = allComments.filter(c => !archivedIds.has(c.comment_id));
+      const catDayCounts = {};
+      REPLY_CATEGORIES.forEach(cat => {
+        catDayCounts[cat] = {};
+        days.forEach(d => { catDayCounts[cat][d] = 0; });
+      });
+      liveComments.forEach(c => {
+        if (!c.created_time) return;
+        const key = c.created_time.slice(0, 10);
+        const cat = categoryOf(c);
+        if (catDayCounts[cat] && key in catDayCounts[cat]) catDayCounts[cat][key]++;
+      });
+      const catTotals = {};
+      REPLY_CATEGORIES.forEach(cat => {
+        catTotals[cat] = days.reduce((sum, d) => sum + catDayCounts[cat][d], 0);
+      });
+      const activeCats = REPLY_CATEGORIES.filter(cat => catTotals[cat] > 0);
+
+      const catTrendCtx = document.getElementById('categoryTrendChart');
+      if (window._catTrendChartInstance) window._catTrendChartInstance.destroy();
+      window._catTrendChartInstance = new Chart(catTrendCtx, {
+        type: 'line',
+        data: {
+          labels: days.map(d => d.slice(5)),
+          datasets: activeCats.map(cat => ({
+            label: cat,
+            data: days.map(d => catDayCounts[cat][d]),
+            borderColor: CATEGORY_COLORS[cat] || '#8b95a1',
+            backgroundColor: 'transparent',
+            tension: 0.3,
+            borderWidth: 2,
+            pointRadius: 0,
+            pointHoverRadius: 4,
+          })),
+        },
+        options: {
+          responsive: true,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { position: 'bottom', labels: { color: textColor, boxWidth: 12, font: { size: 11 } } },
+            title: { display: true, text: 'แนวโน้มหมวดหมู่ 14 วันล่าสุด (จากข้อมูลที่โหลดในหน้านี้)', color: textColor },
+          },
+          scales: {
+            x: { ticks: { color: mutedColor }, grid: { display: false } },
+            y: { ticks: { color: mutedColor, precision: 0 }, grid: { color: borderColor } },
+          },
+        },
+      });
+
+      const catSplitCtx = document.getElementById('categorySplitChart');
+      if (window._catSplitChartInstance) window._catSplitChartInstance.destroy();
+      window._catSplitChartInstance = new Chart(catSplitCtx, {
+        type: 'doughnut',
+        data: {
+          labels: activeCats.length ? activeCats : ['ไม่มีข้อมูล'],
+          datasets: [{
+            data: activeCats.length ? activeCats.map(cat => catTotals[cat]) : [1],
+            backgroundColor: activeCats.length ? activeCats.map(cat => CATEGORY_COLORS[cat] || '#8b95a1') : ['#8b95a1'],
+            borderWidth: 0,
+          }],
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: { position: 'bottom', labels: { color: textColor, boxWidth: 12, font: { size: 11 } } },
+            title: { display: true, text: 'สัดส่วนหมวดหมู่', color: textColor },
+          },
         },
       });
 
@@ -3555,7 +3640,7 @@
     }
     allComments = commentsRes.data || [];
     allPosts = postsRes.data || [];
-    renderSidebar();
+    renderSidebarForMode();
     renderMain();
     document.getElementById('statusText').textContent = 'อัปเดตล่าสุด ' + new Date().toLocaleTimeString('th-TH');
 
