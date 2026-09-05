@@ -697,6 +697,45 @@
   .dash-delta.down { color: var(--accent); }
   .dash-delta.flat { color: var(--muted); }
 
+  .cat-side-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 2px 4px 12px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 10px;
+  }
+  .cat-side-total { font-family: 'IBM Plex Mono', monospace; font-size: 22px; font-weight: 600; }
+  .cat-side-total-label { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .cat-side-window { font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; color: var(--muted); }
+  .cat-row {
+    padding: 10px;
+    border-radius: 9px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    margin-bottom: 4px;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .cat-row:hover { background: var(--panel-hover); }
+  .cat-row.spiking { border-color: rgba(239,68,68,0.5); background: rgba(239,68,68,0.07); }
+  .cat-row-top { display: flex; align-items: center; gap: 7px; margin-bottom: 7px; }
+  .cat-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .cat-name {
+    font-family: 'Prompt', sans-serif; font-weight: 600; font-size: 12.5px;
+    flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .cat-count { font-family: 'IBM Plex Mono', monospace; font-size: 14px; font-weight: 600; flex-shrink: 0; }
+  .cat-bar { height: 5px; background: var(--panel-hover); border-radius: 3px; overflow: hidden; margin-bottom: 7px; }
+  .cat-foot {
+    display: flex; justify-content: space-between; align-items: center; gap: 6px;
+    font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; color: var(--muted);
+  }
+  .cat-spike-badge {
+    font-family: 'Prompt', sans-serif; font-weight: 700; font-size: 10px;
+    padding: 1px 7px; border-radius: 999px;
+    background: rgba(239,68,68,0.18); color: #ef4444;
+  }
+
   .dash-platform-title {
     font-family: 'Prompt', sans-serif;
     font-size: 16px;
@@ -2370,43 +2409,66 @@
       return;
     }
 
-    const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-    const counts = {}, recent = {};
-    live.forEach(c => {
-      const k = categoryOf(c);
-      counts[k] = (counts[k] || 0) + 1;
-      if (c.created_time && c.created_time >= dayAgo) recent[k] = (recent[k] || 0) + 1;
-    });
+    // Totals come from the loaded feed; the 24h figure and the spike flag come
+    // from the server aggregate when it's available, since that covers the
+    // full window rather than just what's been loaded.
+    const counts = {};
+    live.forEach(c => { const k = categoryOf(c); counts[k] = (counts[k] || 0) + 1; });
 
+    const recent = {};
+    let windowLabel = 'จาก ' + live.length.toLocaleString('th-TH') + ' คอมเมนต์ที่โหลดไว้';
+    if (categoryTrend) {
+      const dayKeys = Object.keys(categoryTrend).sort();
+      const today = dayKeys[dayKeys.length - 1];
+      Object.entries(categoryTrend[today] || {}).forEach(([cat, n]) => { recent[cat] = n; });
+      windowLabel = 'ตัวเลข 24 ชม. จากฐานข้อมูล';
+    } else {
+      const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      live.forEach(c => {
+        if (c.created_time && c.created_time >= dayAgo) {
+          const k = categoryOf(c);
+          recent[k] = (recent[k] || 0) + 1;
+        }
+      });
+    }
+
+    const spike = detectCategorySpike();
     const ordered = REPLY_CATEGORIES.filter(cat => counts[cat]).sort((a, b) => counts[b] - counts[a]);
     const max = Math.max(...ordered.map(cat => counts[cat]));
+    const total = ordered.reduce((sum, cat) => sum + counts[cat], 0);
 
     setHtmlIfChanged(list, `
-      <div class="sidebar-group" style="margin-bottom:10px;">
-        <div class="sidebar-group-body">
-          ${ordered.map(cat => {
-            const color = CATEGORY_COLORS[cat] || '#8b95a1';
-            const pct = Math.round((counts[cat] / max) * 100);
-            return `
-              <div class="post-item" data-category="${escapeHtml(cat)}" title="คลิกเพื่อดูคอมเมนต์หมวดนี้">
-                <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:6px;">
-                  <span style="font-family:'Prompt',sans-serif;font-weight:600;font-size:12.5px;color:${color};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(cat)}</span>
-                  <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;flex-shrink:0;">${counts[cat].toLocaleString('th-TH')}</span>
-                </div>
-                <div style="height:6px;background:var(--panel-hover);border-radius:3px;overflow:hidden;margin-bottom:5px;">
-                  <div style="width:${pct}%;height:100%;background:${color};"></div>
-                </div>
-                <div class="post-meta">
-                  <span>${recent[cat] ? '24 ชม. ล่าสุด ' + recent[cat] : '\u00a0'}</span>
-                  <span>${Math.round((counts[cat] / live.length) * 100)}%</span>
-                </div>
-              </div>
-            `;
-          }).join('')}
+      <div class="cat-side-head">
+        <div>
+          <div class="cat-side-total">${total.toLocaleString('th-TH')}</div>
+          <div class="cat-side-total-label">คอมเมนต์ที่จัดหมวดแล้ว</div>
         </div>
+        <div class="cat-side-window">${ordered.length} หมวด</div>
       </div>
-      <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--muted);padding:2px 10px;line-height:1.6;">
-        จาก ${live.length.toLocaleString('th-TH')} คอมเมนต์ที่โหลดไว้ (ไม่รวมที่เก็บถาวร)
+
+      ${ordered.map(cat => {
+        const color = CATEGORY_COLORS[cat] || '#8b95a1';
+        const pct = Math.round((counts[cat] / max) * 100);
+        const share = Math.round((counts[cat] / total) * 100);
+        const isSpiking = spike && spike.category === cat;
+        return `
+          <div class="cat-row ${isSpiking ? 'spiking' : ''}" data-category="${escapeHtml(cat)}" title="คลิกเพื่อดูคอมเมนต์หมวดนี้">
+            <div class="cat-row-top">
+              <span class="cat-dot" style="background:${color};"></span>
+              <span class="cat-name" style="color:${color};">${escapeHtml(cat)}</span>
+              <span class="cat-count">${counts[cat].toLocaleString('th-TH')}</span>
+            </div>
+            <div class="cat-bar"><div style="width:${pct}%;height:100%;background:${color};"></div></div>
+            <div class="cat-foot">
+              <span>${recent[cat] ? '24 ชม. ' + recent[cat] : '24 ชม. —'}</span>
+              ${isSpiking ? `<span class="cat-spike-badge">▲ ${spike.multiple}×</span>` : `<span>${share}%</span>`}
+            </div>
+          </div>
+        `;
+      }).join('')}
+
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted);padding:8px 10px 0;line-height:1.6;">
+        ${windowLabel} · ไม่รวมที่เก็บถาวร
       </div>
     `);
   }
@@ -2437,10 +2499,9 @@
       }
       return;
     }
-    const item = e.target.closest('.post-item');
-    if (!item) return;
-    if (item.dataset.category !== undefined) {
-      currentCategoryFilter = item.dataset.category;
+    const catRow = e.target.closest('[data-category]');
+    if (catRow) {
+      currentCategoryFilter = catRow.dataset.category;
       currentMode = 'comments';
       clearUnread('comments');
       document.querySelectorAll('.mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === 'comments'));
@@ -2449,6 +2510,8 @@
       renderMain();
       return;
     }
+    const item = e.target.closest('.post-item');
+    if (!item) return;
     if (item.dataset.channelId !== undefined) {
       selectDiscordChannel(item.dataset.channelId);
       return;
